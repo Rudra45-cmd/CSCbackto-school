@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: #f8fafc;
@@ -1227,3 +1229,513 @@ main .text-\[11px\] {
   color: #5b6b82;
 }
 
+
+/* =========================================================
+   STUDYSYNC — GLOBAL DARK THEME
+   ========================================================= */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  background: #070a12;
+}
+
+html[data-theme="dark"] body {
+  background: #070a12 !important;
+  color: #e5e7eb !important;
+}
+
+/* ---------------------------------------------------------
+   GLOBAL PAGE BACKGROUNDS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] #root {
+  background:
+    radial-gradient(
+      circle at 15% 5%,
+      rgba(124, 58, 237, 0.10),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 85% 15%,
+      rgba(37, 99, 235, 0.08),
+      transparent 28%
+    ),
+    #070a12 !important;
+  min-height: 100vh;
+}
+
+/* Common light backgrounds */
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/95,
+html[data-theme="dark"] .bg-white\/90,
+html[data-theme="dark"] .bg-white\/80,
+html[data-theme="dark"] .bg-white\/75,
+html[data-theme="dark"] .bg-white\/70,
+html[data-theme="dark"] .bg-white\/60,
+html[data-theme="dark"] .bg-white\/50 {
+  background-color: #111827 !important;
+}
+
+/* Slate backgrounds */
+html[data-theme="dark"] .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+html[data-theme="dark"] .bg-slate-100 {
+  background-color: #172033 !important;
+}
+
+html[data-theme="dark"] .bg-slate-200 {
+  background-color: #1e293b !important;
+}
+
+/* ---------------------------------------------------------
+   GLOBAL TEXT
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .text-slate-950,
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="dark"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+html[data-theme="dark"] .text-slate-300 {
+  color: #94a3b8 !important;
+}
+
+/* ---------------------------------------------------------
+   GLOBAL BORDERS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .border-slate-50,
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-300 {
+  border-color: #263449 !important;
+}
+
+/* ---------------------------------------------------------
+   SIDEBAR
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] aside {
+  background: #090e1a !important;
+  border-color: #1e293b !important;
+  color: #e5e7eb !important;
+}
+
+html[data-theme="dark"] aside .bg-white,
+html[data-theme="dark"] aside .bg-white\/80,
+html[data-theme="dark"] aside .bg-white\/90 {
+  background-color: #111827 !important;
+}
+
+html[data-theme="dark"] aside a,
+html[data-theme="dark"] aside button {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] aside a:hover,
+html[data-theme="dark"] aside button:hover {
+  color: #f8fafc;
+  background-color: #172033;
+}
+
+/* Keep active navigation purple */
+html[data-theme="dark"] aside .bg-violet-500,
+html[data-theme="dark"] aside .bg-violet-600,
+html[data-theme="dark"] aside .bg-purple-500,
+html[data-theme="dark"] aside .bg-purple-600 {
+  color: #ffffff !important;
+}
+
+/* ---------------------------------------------------------
+   HEADER
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] header {
+  background: #0d1320 !important;
+  border-color: #1e293b !important;
+  color: #e5e7eb !important;
+}
+
+html[data-theme="dark"] header input {
+  background: #172033 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] header button {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+/* ---------------------------------------------------------
+   CARDS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .rounded-xl,
+html[data-theme="dark"] .rounded-2xl,
+html[data-theme="dark"] .rounded-3xl,
+html[data-theme="dark"] .rounded-\[20px\],
+html[data-theme="dark"] .rounded-\[24px\],
+html[data-theme="dark"] .rounded-\[28px\],
+html[data-theme="dark"] .rounded-\[32px\] {
+  border-color: #263449;
+}
+
+/* ---------------------------------------------------------
+   INPUTS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] select:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14) !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+html[data-theme="dark"] option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+/* ---------------------------------------------------------
+   BUTTONS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] button:not(.bg-violet-500):not(.bg-violet-600) {
+  border-color: #334155;
+}
+
+/* Purple primary actions stay purple */
+html[data-theme="dark"] .bg-violet-500,
+html[data-theme="dark"] .bg-violet-600,
+html[data-theme="dark"] .bg-purple-500,
+html[data-theme="dark"] .bg-purple-600 {
+  color: #ffffff !important;
+}
+
+/* ---------------------------------------------------------
+   DASHBOARD / WORKSPACE PANELS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] [class*="shadow"] {
+  --tw-shadow-color: rgba(0, 0, 0, 0.35);
+}
+
+/* ---------------------------------------------------------
+   TABLES / LISTS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] table {
+  color: #e5e7eb;
+}
+
+html[data-theme="dark"] th {
+  color: #94a3b8 !important;
+  background: #0f172a !important;
+}
+
+html[data-theme="dark"] td {
+  border-color: #263449 !important;
+}
+
+html[data-theme="dark"] tr:hover {
+  background: rgba(51, 65, 85, 0.28) !important;
+}
+
+/* ---------------------------------------------------------
+   MODALS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] [class*="fixed"][class*="inset-0"] {
+  color: #e5e7eb;
+}
+
+html[data-theme="dark"] .bg-slate-950\/45,
+html[data-theme="dark"] .bg-slate-950\/50,
+html[data-theme="dark"] .bg-black\/40,
+html[data-theme="dark"] .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.72) !important;
+}
+
+/* ---------------------------------------------------------
+   DROPDOWNS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] [role="menu"],
+html[data-theme="dark"] [role="listbox"] {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e5e7eb !important;
+}
+
+/* ---------------------------------------------------------
+   LINKS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .text-blue-600,
+html[data-theme="dark"] .text-indigo-600,
+html[data-theme="dark"] .text-violet-600,
+html[data-theme="dark"] .text-purple-600 {
+  color: #a78bfa !important;
+}
+
+/* ---------------------------------------------------------
+   SUCCESS / INFO / WARNING / DANGER PANELS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .bg-emerald-50 {
+  background-color: #062e25 !important;
+}
+
+html[data-theme="dark"] .bg-green-50 {
+  background-color: #082b20 !important;
+}
+
+html[data-theme="dark"] .bg-blue-50 {
+  background-color: #0c1f38 !important;
+}
+
+html[data-theme="dark"] .bg-indigo-50 {
+  background-color: #171538 !important;
+}
+
+html[data-theme="dark"] .bg-violet-50 {
+  background-color: #21153d !important;
+}
+
+html[data-theme="dark"] .bg-purple-50 {
+  background-color: #21153d !important;
+}
+
+html[data-theme="dark"] .bg-amber-50 {
+  background-color: #30230b !important;
+}
+
+html[data-theme="dark"] .bg-yellow-50 {
+  background-color: #30230b !important;
+}
+
+html[data-theme="dark"] .bg-red-50 {
+  background-color: #351318 !important;
+}
+
+/* ---------------------------------------------------------
+   ICON BACKGROUNDS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .bg-slate-100 {
+  color: #cbd5e1;
+}
+
+/* ---------------------------------------------------------
+   PROGRESS BARS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] [class*="bg-slate-200"] {
+  background-color: #263449 !important;
+}
+
+/* ---------------------------------------------------------
+   DIVIDERS
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme="dark"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #263449 !important;
+}
+
+/* ---------------------------------------------------------
+   FOCUS MODE
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] [data-focus-mode],
+html[data-theme="dark"] .focus-mode {
+  color: #f8fafc;
+}
+
+/* ---------------------------------------------------------
+   SCROLLBAR
+   --------------------------------------------------------- */
+
+html[data-theme="dark"] ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #070a12;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 999px;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ---------------------------------------------------------
+   SMOOTH THEME TRANSITION
+   --------------------------------------------------------- */
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root,
+html[data-theme="dark"] aside,
+html[data-theme="dark"] header {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+
+/* =========================================================
+   STUDYSYNC DARK BLUE CARD SYSTEM
+   ========================================================= */
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/95,
+html[data-theme="dark"] .bg-white\/90,
+html[data-theme="dark"] .bg-white\/80,
+html[data-theme="dark"] .bg-white\/75,
+html[data-theme="dark"] .bg-white\/70,
+html[data-theme="dark"] .bg-white\/60,
+html[data-theme="dark"] .bg-white\/50 {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(20, 47, 79, 0.96),
+      rgba(12, 32, 58, 0.96)
+    ) !important;
+  border-color: rgba(96, 165, 250, 0.28) !important;
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(147, 197, 253, 0.08) !important;
+}
+
+/* Dashboard statistic cards */
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-100 {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(22, 52, 87, 0.98),
+      rgba(13, 35, 63, 0.98)
+    ) !important;
+}
+
+/* Inner assignment cards */
+html[data-theme="dark"] .bg-white\/80 .bg-white,
+html[data-theme="dark"] .bg-white\/90 .bg-white {
+  background:
+    linear-gradient(
+      145deg,
+      #16375c,
+      #102b4b
+    ) !important;
+}
+
+/* Blue card borders */
+html[data-theme="dark"] [class*="rounded-2xl"],
+html[data-theme="dark"] [class*="rounded-3xl"],
+html[data-theme="dark"] [class*="rounded-[24px]"] {
+  border-color: rgba(96, 165, 250, 0.30) !important;
+}
+
+/* Card headings */
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700 {
+  color: #f1f7ff !important;
+}
+
+/* Card descriptions */
+html[data-theme="dark"] .text-slate-600 {
+  color: #c2d4e8 !important;
+}
+
+html[data-theme="dark"] .text-slate-500 {
+  color: #91a9c4 !important;
+}
+
+/* Assignment progress background */
+html[data-theme="dark"] .bg-slate-200 {
+  background-color: #294563 !important;
+}
+
+/* Blue glass glow */
+html[data-theme="dark"] .shadow-sm,
+html[data-theme="dark"] .shadow-md,
+html[data-theme="dark"] .shadow-lg {
+  --tw-shadow-color: rgba(0, 0, 0, 0.28);
+}
+
+/* Keep purple progress bars */
+html[data-theme="dark"] .bg-violet-500,
+html[data-theme="dark"] .bg-violet-600,
+html[data-theme="dark"] .bg-purple-500,
+html[data-theme="dark"] .bg-purple-600 {
+  background-color: #8b5cf6 !important;
+}
+
+/* Completed green elements */
+html[data-theme="dark"] .bg-emerald-500 {
+  background-color: #10b981 !important;
+}
+
+/* Blue icon containers */
+html[data-theme="dark"] .bg-blue-50 {
+  background-color: rgba(30, 64, 175, 0.22) !important;
+}
+
+html[data-theme="dark"] .bg-cyan-50 {
+  background-color: rgba(8, 145, 178, 0.20) !important;
+}
+
+/* Cards should remain clearly separated from page */
+html[data-theme="dark"] main {
+  background: transparent !important;
+}
+
+/* Dark blue scrollbar */
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #060b16;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #24466d;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #356493;
+}

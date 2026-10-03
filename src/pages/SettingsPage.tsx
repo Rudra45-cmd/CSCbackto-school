@@ -1,178 +1,650 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
+import { getToken, logout } from "../lib/auth";
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
+  Clock3,
+  Check,
+  ChevronDown,
   Moon,
+  RotateCcw,
   ShieldCheck,
   Smartphone,
+  Sun,
+  Trash2,
   Volume2,
+  X,
 } from "lucide-react";
 
+type Theme = "light" | "dark";
+
+type Settings = {
+  notifications: boolean;
+  assignmentReminders: boolean;
+  examReminders: boolean;
+  studyReminders: boolean;
+  announcementNotifications: boolean;
+  sound: boolean;
+  compact: boolean;
+  theme: Theme;
+  dailyStudyGoal: string;
+  focusDuration: number;
+  breakDuration: number;
+  aiEnabled: boolean;
+  personalizedRecommendations: boolean;
+  automaticStudyPlans: boolean;
+  quizDifficulty: "easy" | "medium" | "hard";
+};
+
+const SETTINGS_KEY = "studysync_settings";
+const THEME_KEY = "studysync_theme";
+
+const defaultSettings: Settings = {
+  notifications: true,
+  assignmentReminders: true,
+  examReminders: true,
+  studyReminders: true,
+  announcementNotifications: true,
+  sound: false,
+  compact: true,
+  theme: "light",
+  dailyStudyGoal: "2 hours",
+  focusDuration: 45,
+  breakDuration: 10,
+  aiEnabled: true,
+  personalizedRecommendations: true,
+  automaticStudyPlans: false,
+  quizDifficulty: "medium",
+};
+
+function loadSettings(): Settings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (!stored) return defaultSettings;
+
+    return {
+      ...defaultSettings,
+      ...JSON.parse(stored),
+    };
+  } catch {
+    return defaultSettings;
+  }
+}
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+
+  root.dataset.theme = theme;
+  root.classList.toggle("dark", theme === "dark");
+
+  localStorage.setItem(THEME_KEY, theme);
+}
+
 export default function SettingsPage() {
-  const [notifications, setNotifications] = useState(true);
-  const [sound, setSound] = useState(true);
-  const [compact, setCompact] = useState(false);
+  const navigate = useNavigate();
 
-  function toggle(
-    key: "notifications" | "sound" | "compact",
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [saved, setSaved] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
+
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event("studysync:settings-changed"));
+
+    setSaved(true);
+
+    const timer = window.setTimeout(() => {
+      setSaved(false);
+    }, 1600);
+
+    return () => window.clearTimeout(timer);
+  }, [settings]);
+
+  function updateSetting<K extends keyof Settings>(
+    key: K,
+    value: Settings[K],
   ) {
-    if (key === "notifications") {
-      setNotifications((value) => !value);
-    }
+    setSettings((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
 
-    if (key === "sound") {
-      setSound((value) => !value);
-    }
+  function resetPreferences() {
+    setSettings(defaultSettings);
+    applyTheme("light");
+  }
 
-    if (key === "compact") {
-      setCompact((value) => !value);
+  async function deleteAccount() {
+    if (deleteText !== "DELETE") return;
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      await apiFetch("/api/auth/account", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      localStorage.removeItem(SETTINGS_KEY);
+      localStorage.removeItem(THEME_KEY);
+      logout();
+
+      document.documentElement.dataset.theme = "light";
+      document.documentElement.classList.remove("dark");
+
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete your account.",
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
-  const settings = [
-    {
-      key: "notifications" as const,
-      title: "Study notifications",
-      description:
-        "Receive reminders about assignments and study sessions.",
-      icon: Bell,
-      enabled: notifications,
-    },
-    {
-      key: "sound" as const,
-      title: "Focus sounds",
-      description:
-        "Allow ambient sounds to play during Focus Mode.",
-      icon: Volume2,
-      enabled: sound,
-    },
-    {
-      key: "compact" as const,
-      title: "Compact workspace",
-      description:
-        "Use tighter spacing across supported StudySync views.",
-      icon: Smartphone,
-      enabled: compact,
-    },
-  ];
-
   return (
-    <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-500">
-            Preferences
-          </p>
+    <div className="mx-auto w-full max-w-4xl space-y-4 pb-12">
+      {/* General */}
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/80 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="border-b border-slate-200/70 px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">
+                General
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                These preferences are saved on this device.
+              </p>
+            </div>
 
-          <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-            Settings
-          </h1>
+            {saved && (
+              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                <Check size={14} />
+                Saved
+              </div>
+            )}
+          </div>
+        </div>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Customize how StudySync works for you.
+        <SettingRow
+          icon={<Bell size={18} />}
+          title="Study notifications"
+          description="Receive reminders about assignments and study sessions."
+          enabled={settings.notifications}
+          onChange={(value) => updateSetting("notifications", value)}
+        />
+
+        <SettingRow
+          icon={<Volume2 size={18} />}
+          title="Focus sounds"
+          description="Allow ambient sounds to play during Focus Mode."
+          enabled={settings.sound}
+          onChange={(value) => updateSetting("sound", value)}
+        />
+
+        <SettingRow
+          icon={<Smartphone size={18} />}
+          title="Compact workspace"
+          description="Use tighter spacing in supported StudySync views."
+          enabled={settings.compact}
+          onChange={(value) => updateSetting("compact", value)}
+        />
+      </section>
+
+      {/* Appearance */}
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/80 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="border-b border-slate-200/70 px-6 py-5">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Appearance
+          </h2>
+        </div>
+
+        <div className="flex items-center justify-between gap-5 px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+              {settings.theme === "dark" ? (
+                <Moon size={18} />
+              ) : (
+                <Sun size={18} />
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Theme</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Switch between the light and dark StudySync workspace.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative">
+            <select
+              value={settings.theme}
+              onChange={(event) =>
+                updateSetting("theme", event.target.value as Theme)
+              }
+              className="appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-4 pr-10 text-xs font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+
+            <ChevronDown
+              size={14}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Study Preferences */}
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/80 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="border-b border-slate-200/70 px-6 py-5">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Study Preferences
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Customize how StudySync supports your study routine.
           </p>
         </div>
 
-        <section className="mt-7 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <h2 className="text-sm font-bold text-slate-900">
-              General
-            </h2>
-          </div>
+        <div className="grid gap-4 px-6 py-5 sm:grid-cols-3">
 
-          <div className="divide-y divide-slate-100">
-            {settings.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div
-                  key={item.key}
-                  className="flex items-center gap-4 px-6 py-5"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                    <Icon size={17} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {item.title}
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => toggle(item.key)}
-                    className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                      item.enabled
-                        ? "bg-violet-600"
-                        : "bg-slate-200"
-                    }`}
-                    aria-label={`Toggle ${item.title}`}
-                  >
-                    <span
-                      className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                        item.enabled
-                          ? "left-6"
-                          : "left-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <h2 className="text-sm font-bold text-slate-900">
-              Appearance
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-4 px-6 py-5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-              <Moon size={17} />
-            </div>
-
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-800">
-                Theme
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                StudySync currently uses the light workspace theme.
-              </p>
-            </div>
-
-            <span className="rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-bold text-slate-500">
-              Light
+          <label className="block">
+            <span className="mb-2 block text-xs font-semibold text-slate-600">
+              Daily study goal
             </span>
-          </div>
-        </section>
 
-        <section className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/60 p-6">
-          <div className="flex gap-3">
-            <ShieldCheck
-              size={20}
-              className="mt-0.5 shrink-0 text-emerald-600"
+            <select
+              value={settings.dailyStudyGoal}
+              onChange={(event) =>
+                updateSetting("dailyStudyGoal", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+            >
+              <option value="1 hour">1 hour</option>
+              <option value="2 hours">2 hours</option>
+              <option value="3 hours">3 hours</option>
+              <option value="4 hours">4 hours</option>
+              <option value="5+ hours">5+ hours</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-semibold text-slate-600">
+              Focus session
+            </span>
+
+            <select
+              value={settings.focusDuration}
+              onChange={(event) =>
+                updateSetting("focusDuration", Number(event.target.value))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+            >
+              <option value={25}>25 minutes</option>
+              <option value={45}>45 minutes</option>
+              <option value={50}>50 minutes</option>
+              <option value={60}>60 minutes</option>
+              <option value={90}>90 minutes</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-semibold text-slate-600">
+              Break duration
+            </span>
+
+            <select
+              value={settings.breakDuration}
+              onChange={(event) =>
+                updateSetting("breakDuration", Number(event.target.value))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+            >
+              <option value={5}>5 minutes</option>
+              <option value={10}>10 minutes</option>
+              <option value={15}>15 minutes</option>
+              <option value={20}>20 minutes</option>
+            </select>
+          </label>
+
+        </div>
+      </section>
+
+      {/* Notifications */}
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/80 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+        <div className="border-b border-slate-200/70 px-6 py-5">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Notifications
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Choose which StudySync reminders you want to receive.
+          </p>
+        </div>
+
+        <SettingRow
+          icon={<Bell size={18} />}
+          title="Assignment reminders"
+          description="Remind you about upcoming assignment deadlines."
+          enabled={settings.assignmentReminders}
+          onChange={(value) =>
+            updateSetting("assignmentReminders", value)
+          }
+        />
+
+        <SettingRow
+          icon={<Bell size={18} />}
+          title="Exam reminders"
+          description="Receive reminders for upcoming exams and important dates."
+          enabled={settings.examReminders}
+          onChange={(value) => updateSetting("examReminders", value)}
+        />
+
+        <SettingRow
+          icon={<Clock3 size={18} />}
+          title="Study session reminders"
+          description="Get reminders when it is time to study."
+          enabled={settings.studyReminders}
+          onChange={(value) => updateSetting("studyReminders", value)}
+        />
+
+        <SettingRow
+          icon={<Bell size={18} />}
+          title="Announcement notifications"
+          description="Stay informed about important StudySync announcements."
+          enabled={settings.announcementNotifications}
+          onChange={(value) =>
+            updateSetting("announcementNotifications", value)
+          }
+        />
+      </section>
+
+      {/* AI Preferences */}
+      <section className="overflow-hidden rounded-[24px] border border-violet-200/80 bg-white/80 shadow-[0_12px_40px_rgba(139,92,246,0.06)] backdrop-blur-xl">
+        <div className="border-b border-violet-100 px-6 py-5">
+          <h2 className="text-sm font-semibold text-slate-800">
+            AI Preferences
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Control how StudySync AI supports your learning.
+          </p>
+        </div>
+
+        <SettingRow
+          icon={<SparklesIcon />}
+          title="StudySync AI"
+          description="Allow StudySync AI to provide academic assistance."
+          enabled={settings.aiEnabled}
+          onChange={(value) => updateSetting("aiEnabled", value)}
+        />
+
+        <SettingRow
+          icon={<SparklesIcon />}
+          title="Personalized recommendations"
+          description="Use your assignments and study activity for recommendations."
+          enabled={settings.personalizedRecommendations}
+          onChange={(value) =>
+            updateSetting("personalizedRecommendations", value)
+          }
+        />
+
+        <SettingRow
+          icon={<SparklesIcon />}
+          title="Automatic study-plan suggestions"
+          description="Let StudySync suggest study sessions based on deadlines."
+          enabled={settings.automaticStudyPlans}
+          onChange={(value) =>
+            updateSetting("automaticStudyPlans", value)
+          }
+        />
+
+        <div className="flex items-center justify-between gap-5 px-6 py-5">
+          <div>
+            <p className="text-sm font-semibold text-slate-700">
+              Quiz difficulty
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Default difficulty for AI-generated practice questions.
+            </p>
+          </div>
+
+          <select
+            value={settings.quizDifficulty}
+            onChange={(event) =>
+              updateSetting(
+                "quizDifficulty",
+                event.target.value as Settings["quizDifficulty"],
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+          >
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+      </section>
+
+      {/* Privacy */}
+      <section className="rounded-[24px] border border-emerald-200/70 bg-emerald-50/70 px-6 py-5 shadow-[0_12px_40px_rgba(16,185,129,0.05)]">
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+            <ShieldCheck size={19} />
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold text-emerald-900">
+              Privacy & Security
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-emerald-800/80">
+              Your account data is protected by your authenticated StudySync
+              session. Device preferences are stored locally in your browser.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Preferences */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/80 px-6 py-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)] backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Reset preferences
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Restore notifications, sounds, compact mode and theme to their
+              defaults.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetPreferences}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+          >
+            <RotateCcw size={14} />
+            Reset
+          </button>
+        </div>
+      </section>
+
+      {/* Danger Zone */}
+      <section className="overflow-hidden rounded-[24px] border border-red-200 bg-white/80 shadow-[0_12px_40px_rgba(239,68,68,0.05)] backdrop-blur-xl">
+        <div className="border-b border-red-100 bg-red-50/60 px-6 py-5">
+          <h2 className="text-sm font-semibold text-red-700">
+            Danger Zone
+          </h2>
+          <p className="mt-1 text-xs text-red-600/80">
+            Permanent account actions. Deleted account data cannot be restored.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-5 px-6 py-5">
+          <div>
+            <p className="text-sm font-semibold text-slate-700">
+              Delete profile
+            </p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
+              Permanently delete your StudySync account, assignments and saved
+              focus-session history.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteText("");
+              setDeleteError("");
+              setShowDeleteModal(true);
+            }}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-600"
+          >
+            <Trash2 size={14} />
+            Delete Profile
+          </button>
+        </div>
+      </section>
+
+      {/* Delete confirmation */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-white/20 bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                  <Trash2 size={20} />
+                </div>
+
+                <h3 className="text-lg font-bold text-slate-900">
+                  Delete your profile?
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  This permanently deletes your account, assignments and focus
+                  session history. This action cannot be undone.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="block text-xs font-semibold text-slate-600">
+              Type DELETE to confirm
+            </label>
+
+            <input
+              value={deleteText}
+              onChange={(event) =>
+                setDeleteText(event.target.value.toUpperCase())
+              }
+              placeholder="DELETE"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold tracking-wider text-slate-800 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
             />
 
-            <div>
-              <h2 className="text-sm font-bold text-emerald-900">
-                Privacy & Security
-              </h2>
+            {deleteError && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+                {deleteError}
+              </div>
+            )}
 
-              <p className="mt-1 text-xs leading-5 text-emerald-700">
-                Your StudySync account settings are protected by your authenticated session. Keep your login credentials private.
-              </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleteText !== "DELETE" || deleting}
+                onClick={deleteAccount}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 size={14} />
+                {deleting ? "Deleting..." : "Delete permanently"}
+              </button>
             </div>
           </div>
-        </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function SparklesIcon() {
+  return (
+    <span className="text-violet-500">
+      ✦
+    </span>
+  );
+}
+
+
+function SettingRow({
+  icon,
+  title,
+  description,
+  enabled,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  enabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-5 border-b border-slate-200/60 px-6 py-5 last:border-b-0">
+      <div className="flex items-center gap-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+          {icon}
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-slate-700">{title}</p>
+          <p className="mt-1 text-xs text-slate-500">{description}</p>
+        </div>
       </div>
+
+      <button
+        type="button"
+        aria-label={`Toggle ${title}`}
+        aria-pressed={enabled}
+        onClick={() => onChange(!enabled)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+          enabled ? "bg-violet-500 shadow-lg shadow-violet-500/25" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+            enabled ? "left-6" : "left-1"
+          }`}
+        />
+      </button>
     </div>
   );
 }

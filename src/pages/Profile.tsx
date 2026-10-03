@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  CalendarDays,
+  CheckCircle2,
   Clock3,
+  GraduationCap,
   Mail,
   Save,
+  Settings,
+  Sparkles,
   User,
+  Users,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
-import { getToken } from "../lib/auth";
+import { getCurrentUser, getToken } from "../lib/auth";
+import { useStudentProfile } from "../context/StudentProfileContext";
 
 interface Student {
   id: number;
@@ -20,151 +26,375 @@ interface Student {
   preferred_study_time: string;
 }
 
+interface Assignment {
+  id: number;
+  title: string;
+  subject: string;
+  completed: boolean;
+  due_date?: string | null;
+}
+
+interface StudySession {
+  id: number;
+  duration_minutes?: number;
+  duration_seconds?: number;
+  started_at?: string;
+  ended_at?: string;
+}
+
+function normalizeSubjects(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (!parts.length) return "S";
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
 export default function Profile() {
-  const [user, setUser] = useState<Student | null>(null);
+  const { updateStudent } = useStudentProfile();
+
+  const navigate = useNavigate();
+  const token = getToken();
+
+  const [student, setStudent] = useState<Student | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [subjects, setSubjects] = useState("");
   const [dailyGoal, setDailyGoal] = useState("");
-  const [studyTime, setStudyTime] = useState("");
+  const [preferredStudyTime, setPreferredStudyTime] = useState("");
+
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  async function loadProfile() {
-    try {
-      const response = await apiFetch<{ user: Student }>(
-        "/api/auth/me",
-        {
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-        },
-      );
-
-      const current = response.user;
-
-      setUser(current);
-      setName(current.name);
-      setGrade(current.grade);
-      setSubjects(current.subjects.join(", "));
-      setDailyGoal(current.daily_goal);
-      setStudyTime(current.preferred_study_time);
-    } catch (error) {
-      console.error("Failed to load profile:", error);
-      setMessage("Unable to load profile.");
-    }
-  }
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    void loadProfile();
-  }, []);
+    let active = true;
 
-  async function saveProfile() {
+    async function loadProfile() {
+      if (!token) {
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        // Load the student profile independently.
+        // Auxiliary data should never prevent the profile itself from loading.
+        const user = await getCurrentUser();
+
+        if (!active) return;
+
+        const normalizedUser: Student = {
+          ...user,
+          subjects: normalizeSubjects(user.subjects),
+        };
+
+        setStudent(normalizedUser);
+        setName(normalizedUser.name || "");
+        setGrade(normalizedUser.grade || "");
+        setSubjects(normalizedUser.subjects.join(", "));
+        setDailyGoal(normalizedUser.daily_goal || "");
+        setPreferredStudyTime(normalizedUser.preferred_study_time || "");
+
+        // Seed the shared profile state from the authoritative backend user.
+        updateStudent(normalizedUser);
+
+        // Load academic statistics independently.
+        // If either endpoint is unavailable, the profile still works.
+        const [assignmentResult, sessionResult] = await Promise.allSettled([
+          apiFetch<{ assignments: Assignment[] }>("/api/assignments", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          apiFetch<{ sessions: StudySession[] }>("/api/study-sessions", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
+
+        if (!active) return;
+
+        if (
+          assignmentResult.status === "fulfilled" &&
+          Array.isArray(assignmentResult.value.assignments)
+        ) {
+          setAssignments(assignmentResult.value.assignments);
+        } else {
+          setAssignments([]);
+        }
+
+        if (
+          sessionResult.status === "fulfilled" &&
+          Array.isArray(sessionResult.value.sessions)
+        ) {
+          setSessions(sessionResult.value.sessions);
+        } else {
+          setSessions([]);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load your profile."
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [navigate, token]);
+
+  const completedAssignments = useMemo(
+    () => assignments.filter((assignment) => assignment.completed).length,
+    [assignments]
+  );
+
+  const studyMinutes = useMemo(
+    () =>
+      sessions.reduce((total, session) => {
+        if (typeof session.duration_minutes === "number") {
+          return total + session.duration_minutes;
+        }
+
+        if (typeof session.duration_seconds === "number") {
+          return total + Math.round(session.duration_seconds / 60);
+        }
+
+        return total;
+      }, 0),
+    [sessions]
+  );
+
+  const initials = getInitials(name || student?.name || "Student");
+
+  async function handleSave() {
+    if (!token) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    const trimmedName = name.trim();
+    const trimmedGrade = grade.trim();
+    const normalized = normalizeSubjects(subjects);
+
+    if (!trimmedName) {
+      setError("Full name cannot be empty.");
+      return;
+    }
+
+    if (!trimmedGrade) {
+      setError("Grade cannot be empty.");
+      return;
+    }
+
+    if (!dailyGoal.trim()) {
+      setError("Daily study goal cannot be empty.");
+      return;
+    }
+
     try {
       setSaving(true);
-      setMessage("");
+      setSaved(false);
+      setError("");
 
-      const response = await apiFetch<{ user: Student }>(
-        "/api/auth/account",
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            grade,
-            subjects: subjects
-              .split(",")
-              .map((item) => item.trim())
-              .filter(Boolean),
-            daily_goal: dailyGoal,
-            preferred_study_time: studyTime,
-          }),
+      const updated = await apiFetch<Student>("/api/auth/account", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          name: trimmedName,
+          grade: trimmedGrade,
+          subjects: normalized,
+          daily_goal: dailyGoal.trim(),
+          preferred_study_time: preferredStudyTime,
+        }),
+      });
 
-      setUser(response.user);
-      setMessage("Profile updated successfully.");
-    } catch (error) {
-      console.error("Failed to save profile:", error);
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to save profile.",
+      const normalizedUpdated: Student = {
+        ...updated,
+        subjects: normalizeSubjects(updated.subjects),
+      };
+
+      setStudent(normalizedUpdated);
+      setName(normalizedUpdated.name);
+      setGrade(normalizedUpdated.grade);
+      setSubjects(normalizedUpdated.subjects.join(", "));
+      setDailyGoal(normalizedUpdated.daily_goal);
+      setPreferredStudyTime(normalizedUpdated.preferred_study_time);
+
+      // Keep every StudySync page synchronized with the saved profile.
+      updateStudent(normalizedUpdated);
+
+      setSaved(true);
+
+      window.setTimeout(() => {
+        setSaved(false);
+      }, 2500);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save your profile."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  if (!user) {
+  if (loading) {
     return (
-      <div className="min-h-full bg-slate-50 px-6 py-10">
-        <div className="mx-auto max-w-4xl text-sm text-slate-400">
-          Loading profile...
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 shadow-sm">
+          Loading your profile...
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500 to-indigo-600 text-2xl font-bold text-white shadow-lg shadow-violet-500/20">
-              {user.name
-                .split(" ")
-                .map((part) => part[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase()}
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">
+          Account
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+          My Profile
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Manage your student identity and academic preferences.
+        </p>
+      </div>
+
+      {/* Identity card */}
+      <section className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+        <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-violet-50 via-white to-cyan-50 px-5 py-6 sm:px-7">
+          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-200/30 blur-3xl" />
+          <div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-cyan-200/20 blur-3xl" />
+
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white bg-white text-2xl font-bold text-violet-600 shadow-lg shadow-violet-100">
+                {initials}
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-violet-700">
+                    Student Profile
+                  </span>
+                </div>
+
+                <h2 className="text-xl font-bold text-slate-900">
+                  {name || "Student"}
+                </h2>
+
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Mail size={13} />
+                    {student?.email || "No email"}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1.5">
+                    <GraduationCap size={13} />
+                    {grade || "Grade not set"}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-500">
-                Student Profile
-              </p>
+            <button
+              type="button"
+              onClick={() => navigate("/settings")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:text-violet-700"
+            >
+              <Settings size={16} />
+              Account Settings
+            </button>
+          </div>
+        </div>
 
-              <h1 className="mt-1 text-2xl font-bold text-slate-900">
-                {user.name}
-              </h1>
-
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                <Mail size={13} />
-                {user.email}
-              </p>
-            </div>
+        {/* Profile form */}
+        <div className="p-5 sm:p-7">
+          <div className="mb-5 flex items-center gap-2">
+            <User size={17} className="text-violet-600" />
+            <h3 className="font-semibold text-slate-900">
+              Profile Information
+            </h3>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {error && (
+            <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {saved && (
+            <div className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              <CheckCircle2 size={16} />
+              Profile changes saved successfully.
+            </div>
+          )}
+
+          <div className="grid gap-5 sm:grid-cols-2">
             <label className="block">
               <span className="mb-2 block text-xs font-semibold text-slate-600">
                 Full name
               </span>
-              <div className="relative">
-                <User
-                  size={15}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-violet-400 focus:bg-white"
-                />
-              </div>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                placeholder="Your full name"
+              />
             </label>
 
             <label className="block">
               <span className="mb-2 block text-xs font-semibold text-slate-600">
-                Grade
+                Grade / Class
               </span>
               <input
                 value={grade}
                 onChange={(event) => setGrade(event.target.value)}
-                placeholder="e.g. Grade 11"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-violet-400 focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                placeholder="Grade 11"
               />
             </label>
 
@@ -172,40 +402,27 @@ export default function Profile() {
               <span className="mb-2 block text-xs font-semibold text-slate-600">
                 Subjects
               </span>
-              <div className="relative">
-                <BookOpen
-                  size={15}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  value={subjects}
-                  onChange={(event) =>
-                    setSubjects(event.target.value)
-                  }
-                  placeholder="Mathematics, Physics, English"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-violet-400 focus:bg-white"
-                />
-              </div>
+              <input
+                value={subjects}
+                onChange={(event) => setSubjects(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                placeholder="Mathematics, Physics, Chemistry"
+              />
+              <span className="mt-1.5 block text-xs text-slate-400">
+                Separate subjects with commas.
+              </span>
             </label>
 
             <label className="block">
               <span className="mb-2 block text-xs font-semibold text-slate-600">
                 Daily study goal
               </span>
-              <div className="relative">
-                <Clock3
-                  size={15}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  value={dailyGoal}
-                  onChange={(event) =>
-                    setDailyGoal(event.target.value)
-                  }
-                  placeholder="2 hours"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-violet-400 focus:bg-white"
-                />
-              </div>
+              <input
+                value={dailyGoal}
+                onChange={(event) => setDailyGoal(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                placeholder="2 hours"
+              />
             </label>
 
             <label className="block">
@@ -213,12 +430,13 @@ export default function Profile() {
                 Preferred study time
               </span>
               <select
-                value={studyTime}
+                value={preferredStudyTime}
                 onChange={(event) =>
-                  setStudyTime(event.target.value)
+                  setPreferredStudyTime(event.target.value)
                 }
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-violet-400 focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               >
+                <option value="">Select a time</option>
                 <option value="morning">Morning</option>
                 <option value="afternoon">Afternoon</option>
                 <option value="evening">Evening</option>
@@ -227,57 +445,158 @@ export default function Profile() {
             </label>
           </div>
 
-          {message && (
-            <div className="mt-5 rounded-xl bg-violet-50 px-4 py-3 text-xs font-semibold text-violet-700">
-              {message}
-            </div>
-          )}
-
           <div className="mt-6 flex justify-end">
             <button
               type="button"
-              onClick={() => void saveProfile()}
+              onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-xs font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Save size={14} />
+              <Save size={16} />
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </div>
+      </section>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <CalendarDays size={17} className="text-violet-500" />
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Grade
+      {/* Academic overview */}
+      <section className="mt-6">
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Academic Overview
             </p>
-            <p className="mt-1 text-sm font-bold text-slate-800">
-              {user.grade || "Not set"}
-            </p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">
+              Your StudySync activity
+            </h2>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <BookOpen size={17} className="text-sky-500" />
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Subjects
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-800">
-              {user.subjects.length}
-            </p>
+          <Sparkles size={18} className="text-violet-500" />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <OverviewCard
+            icon={<GraduationCap size={17} />}
+            label="Grade"
+            value={grade || "—"}
+            description="Current class"
+            iconClass="bg-violet-50 text-violet-600"
+          />
+
+          <OverviewCard
+            icon={<BookOpen size={17} />}
+            label="Subjects"
+            value={String(normalizeSubjects(subjects).length)}
+            description="Learning subjects"
+            iconClass="bg-cyan-50 text-cyan-600"
+          />
+
+          <OverviewCard
+            icon={<CheckCircle2 size={17} />}
+            label="Completed"
+            value={`${completedAssignments}`}
+            description={`of ${assignments.length} assignments`}
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
+
+          <OverviewCard
+            icon={<Clock3 size={17} />}
+            label="Study time"
+            value={`${studyMinutes} min`}
+            description="Recorded focus time"
+            iconClass="bg-amber-50 text-amber-600"
+          />
+        </div>
+      </section>
+
+      {/* Student snapshot */}
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <Users size={17} />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <Clock3 size={17} className="text-emerald-500" />
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Daily Goal
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-800">
-              {user.daily_goal}
+          <div>
+            <h3 className="font-semibold text-slate-900">
+              Student Snapshot
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              {name || "Your profile"} is currently set to{" "}
+              <span className="font-medium text-slate-700">
+                {grade || "your grade"}
+              </span>{" "}
+              with a daily goal of{" "}
+              <span className="font-medium text-slate-700">
+                {dailyGoal || "not set"}
+              </span>
+              . Your preferred study time is{" "}
+              <span className="font-medium text-slate-700">
+                {preferredStudyTime || "not set"}
+              </span>
+              .
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Account */}
+      <section className="mt-6 mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Account
+            </p>
+            <h3 className="mt-1 font-semibold text-slate-900">
+              Manage your StudySync account
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Update preferences, privacy controls, notifications, and account
+              security from Settings.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/settings")}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+          >
+            <Settings size={16} />
+            Open Settings
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OverviewCard({
+  icon,
+  label,
+  value,
+  description,
+  iconClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  description: string;
+  iconClass: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div
+        className={`mb-4 flex h-9 w-9 items-center justify-center rounded-xl ${iconClass}`}
+      >
+        {icon}
       </div>
+
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+
+      <p className="mt-1 text-xs text-slate-500">{description}</p>
     </div>
   );
 }

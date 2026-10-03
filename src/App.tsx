@@ -1,3 +1,4 @@
+import { useStudentProfile } from "./context/StudentProfileContext";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -16,7 +17,6 @@ import Onboarding from "./pages/Onboarding";
 import { getCurrentUser, logout } from "./lib/auth";
 import { apiFetch } from "./lib/api";
 import { ASSIGNMENTS_CHANGED_EVENT, STUDY_SESSIONS_CHANGED_EVENT } from "./lib/assignmentSync";
-import type { Student } from "./lib/auth";
 import {
   Bell,
   BookOpen,
@@ -29,7 +29,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   Menu,
-  Moon,
   MoreHorizontal,
   Search,
   Settings,
@@ -45,7 +44,7 @@ type NavItem = {
 };
 const navItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
-  { label: "My Learning", icon: BookOpen },
+  { label: "StudySync AI", icon: BookOpen },
   { label: "Assignments", icon: FileText },
   { label: "Study Planner", icon: CalendarDays },
   { label: "Focus Mode", icon: Target },
@@ -144,19 +143,227 @@ function App() {
     </BrowserRouter>
   );
 }
+function NotificationAnnouncementList() {
+  const [items, setItems] = useState<
+    {
+      id: number;
+      title: string;
+      content: string;
+      created_at: string;
+      created_by: string;
+      read: boolean;
+    }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      const token = localStorage.getItem("studysync_access_token");
+
+      if (!token) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await apiFetch<{
+          announcements: {
+            id: number;
+            title: string;
+            content: string;
+            created_at: string;
+            created_by: string;
+            read: boolean;
+          }[];
+        }>("/api/announcements", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setItems(
+          response.announcements
+            .filter((item) => !item.read)
+            .slice(0, 5),
+        );
+      } catch (error) {
+        console.error("Could not load notifications:", error);
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadNotifications();
+  }, []);
+
+  async function markRead(id: number) {
+    const token = localStorage.getItem("studysync_access_token");
+
+    if (!token) return;
+
+    try {
+      await apiFetch(`/api/announcements/${id}/read`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setItems((current) =>
+        current.filter((item) => item.id !== id),
+      );
+    } catch (error) {
+      console.error("Could not mark notification as read:", error);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="px-5 py-8 text-center text-xs text-slate-400">
+        Loading notifications...
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="px-5 py-8 text-center">
+        <Bell size={25} className="mx-auto text-slate-300" />
+
+        <p className="mt-3 text-sm font-semibold text-slate-700">
+          You're all caught up
+        </p>
+
+        <p className="mt-1 text-xs text-slate-400">
+          No unread announcements.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="p-4 transition hover:bg-slate-50"
+        >
+          <div className="flex gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <Bell size={16} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-800">
+                {item.title}
+              </p>
+
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                {item.content}
+              </p>
+
+              <p className="mt-2 text-[10px] text-slate-400">
+                {item.created_by} ·{" "}
+                {new Date(item.created_at).toLocaleString([], {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => void markRead(item.id)}
+                className="mt-3 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[10px] font-bold text-violet-600 transition hover:bg-violet-100"
+              >
+                Mark as read
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StudySyncApp() {
+
+  // Header controls
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
+  const loadUnreadAnnouncements = async () => {
+    const token = localStorage.getItem("studysync_access_token");
+
+    if (!token) {
+      setUnreadAnnouncements(0);
+      return;
+    }
+
+    try {
+      const response = await apiFetch<{ count: number }>(
+        "/api/announcements/unread-count",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      setUnreadAnnouncements(response.count);
+    } catch (error) {
+      console.error("Could not load unread announcements:", error);
+    }
+  };
+
+
+
+
+  useEffect(() => {
+    void loadUnreadAnnouncements();
+
+    const interval = window.setInterval(() => {
+      void loadUnreadAnnouncements();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      if (!target.closest("[data-notification-area]")) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [notificationsOpen]);
+
+
+
+  const { student: sharedStudent } = useStudentProfile();
+
   const navigate = useNavigate();
   const location = useLocation();
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [studentName, setStudentName] = useState("Student");
-  const [student, setStudent] = useState<Student | null>(null);
+  const student = sharedStudent;
   const [workspaceReady, setWorkspaceReady] = useState(
     () => localStorage.getItem("studysync_workspace_ready") === "true"
   );
   const active =
     location.pathname === "/learning"
-      ? "My Learning"
+      ? "StudySync AI"
       : location.pathname === "/assignments"
         ? "Assignments"
         : location.pathname === "/planner"
@@ -325,7 +532,7 @@ function StudySyncApp() {
     async function validateSession() {
       try {
         const user = await getCurrentUser();
-        setStudent(user);
+  
         setStudentName(user.name);
         setAuthenticated(true);
       } catch {
@@ -442,7 +649,7 @@ function StudySyncApp() {
                 onClick={() => {
                   setSidebarOpen(false);
                   if (item.label === "Dashboard") navigate("/");
-                  if (item.label === "My Learning") navigate("/learning");
+                  if (item.label === "StudySync AI") navigate("/learning");
                   if (item.label === "Assignments") navigate("/assignments");
                   if (item.label === "Study Planner") navigate("/planner");
                   if (item.label === "Focus Mode") navigate("/focus");
@@ -509,7 +716,10 @@ function StudySyncApp() {
             <p className="text-xs leading-5 text-slate-500">
               Ask your AI study companion anything about your learning.
             </p>
-            <button className="mt-3 flex items-center gap-1 text-xs font-semibold text-slate-900">
+            <button
+              onClick={() => navigate("/learning")}
+              className="mt-3 flex items-center gap-1 text-xs font-semibold text-slate-900"
+            >
               Open assistant <ChevronRight size={13} />
             </button>
           </div>
@@ -554,7 +764,7 @@ function StudySyncApp() {
               localStorage.removeItem("studysync_onboarding");
               setAuthenticated(false);
               setWorkspaceReady(false);
-              setStudent(null);
+              void 0;
               setStudentName("Student");
               setSidebarOpen(false);
               navigate("/", { replace: true });
@@ -567,7 +777,7 @@ function StudySyncApp() {
       </aside>
       {/* Main */}
       <main className="h-screen overflow-y-auto lg:pl-[260px]">
-        <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#f5f7fb]/80 px-5 py-4 backdrop-blur-xl sm:px-8">
+        <header className="sticky top-0 z-30 flex h-[80px] min-h-0 items-center border-b border-white/[0.06] bg-[#f5f7fb]/80 px-5 py-4 backdrop-blur-xl sm:px-8">
           <div className="flex items-center justify-between gap-3">
             <button
               className="rounded-xl border border-slate-200 p-2.5 text-slate-500 lg:hidden"
@@ -589,13 +799,56 @@ function StudySyncApp() {
               </kbd>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <button className="rounded-xl border border-slate-200 p-2.5 text-slate-500 hover:bg-white/5 hover:text-white">
-                <Moon size={18} />
-              </button>
-              <button className="relative rounded-xl border border-slate-200 p-2.5 text-slate-500 hover:bg-white/5 hover:text-white">
-                <Bell size={18} />
-                <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-violet-400" />
-              </button>
+
+              <div className="relative" data-notification-area>
+                <button
+                  type="button"
+                  aria-label="Open notifications"
+                  aria-expanded={notificationsOpen}
+                  title="Notifications"
+                  onClick={() =>
+                    setNotificationsOpen((current) => !current)
+                  }
+                  className="group relative flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-500/40 dark:hover:bg-violet-950/40"
+                >
+                  <Bell
+                    size={19}
+                    className="transition-transform duration-300 group-hover:rotate-[-8deg]"
+                  />
+
+                  {unreadAnnouncements > 0 && (
+                    <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500 dark:border-slate-900" />
+                  )}
+                </button>
+
+                {notificationsOpen && (
+                  <div className="fixed right-4 top-[66px] z-[9999] w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+                    <div className="border-b border-slate-100 px-4 py-4">
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Notifications
+                      </h3>
+                      <p className="mt-0.5 text-[11px] text-slate-400">
+                        StudySync announcements
+                      </p>
+                    </div>
+
+                    <NotificationAnnouncementList />
+
+                    <div className="border-t border-slate-100 p-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          navigate("/announcements");
+                        }}
+                        className="w-full rounded-xl bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-600 transition hover:bg-violet-100"
+                      >
+                        View all announcements
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>

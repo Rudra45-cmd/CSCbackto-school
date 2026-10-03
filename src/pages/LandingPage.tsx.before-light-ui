@@ -1,0 +1,1038 @@
+import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  GraduationCap,
+  Play,
+  Sparkles,
+  Target,
+  Timer,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+const features = [
+  {
+    number: "01",
+    icon: ClipboardList,
+    title: "Assignments",
+    description:
+      "Keep every deadline, priority, and piece of schoolwork visible without turning your day into a spreadsheet.",
+  },
+  {
+    number: "02",
+    icon: CalendarDays,
+    title: "Study planning",
+    description:
+      "Build realistic study sessions around your actual workload, deadlines, and available time.",
+  },
+  {
+    number: "03",
+    icon: Timer,
+    title: "Focus mode",
+    description:
+      "Start a focused session, put distractions aside, and measure the time you genuinely spend learning.",
+  },
+  {
+    number: "04",
+    icon: Sparkles,
+    title: "StudySync AI",
+    description:
+      "Get academic guidance that understands your assignments, schedule, subjects, and current progress.",
+  },
+  {
+    number: "05",
+    icon: BarChart3,
+    title: "Progress",
+    description:
+      "See your consistency, completed work, and study time without complicated productivity dashboards.",
+  },
+  {
+    number: "06",
+    icon: Users,
+    title: "Community",
+    description:
+      "Learn alongside classmates, exchange resources, and make studying feel less isolated.",
+  },
+];
+
+const schedule = [
+  {
+    time: "09:00",
+    subject: "Mathematics",
+    topic: "Quadratic equations",
+    status: "completed",
+  },
+  {
+    time: "11:00",
+    subject: "Physics",
+    topic: "Mechanics",
+    status: "active",
+  },
+  {
+    time: "13:30",
+    subject: "Chemistry",
+    topic: "Organic chemistry",
+    status: "upcoming",
+  },
+  {
+    time: "15:00",
+    subject: "English",
+    topic: "Literature",
+    status: "upcoming",
+  },
+];
+
+const stats = [
+  ["Tasks", "06"],
+  ["Completed", "04"],
+  ["Study time", "2h 35m"],
+];
+
+export default function LandingPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#fafbfc] text-slate-950">
+      {/* =========================================================
+          BACKGROUND
+      ========================================================== */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute inset-0 opacity-[0.45]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(15,23,42,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.035) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+          }}
+        />
+
+        <div className="absolute left-[-260px] top-[-180px] h-[620px] w-[620px] rounded-full bg-violet-200/25 blur-[120px]" />
+
+        <div className="absolute right-[-260px] top-[220px] h-[620px] w-[620px] rounded-full bg-blue-200/20 blur-[130px]" />
+      </div>
+
+      {/* =========================================================
+          NAVBAR
+      ========================================================== */}
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-[#fafbfc]/85 backdrop-blur-2xl">
+        <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="group flex items-center gap-3"
+          >
+            <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[13px] bg-slate-950 text-white shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/70 to-blue-500/70 opacity-80" />
+              <GraduationCap size={20} className="relative" />
+            </div>
+
+            <div className="text-left">
+              <div className="text-[18px] font-black tracking-[-0.04em]">
+                Study<span className="text-violet-600">Sync</span>
+              </div>
+
+              <div className="hidden text-[8px] font-bold uppercase tracking-[0.24em] text-slate-400 sm:block">
+                Student workspace
+              </div>
+            </div>
+          </button>
+
+          <nav className="hidden items-center gap-9 text-[13px] font-semibold text-slate-500 md:flex">
+            <a
+              href="#features"
+              className="transition-colors hover:text-slate-950"
+            >
+              Features
+            </a>
+
+            <a
+              href="#how-it-works"
+              className="transition-colors hover:text-slate-950"
+            >
+              How it works
+            </a>
+
+            <a
+              href="#ai"
+              className="transition-colors hover:text-slate-950"
+            >
+              StudySync AI
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="hidden rounded-xl px-4 py-2.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 sm:block"
+            >
+              Log in
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/signup")}
+              className="group flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-violet-700"
+            >
+              Get started
+              <ArrowRight
+                size={14}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        {/* =========================================================
+            HERO
+        ========================================================== */}
+        <section className="relative mx-auto max-w-7xl px-5 pb-24 pt-16 sm:px-6 lg:px-8 lg:pb-32 lg:pt-24">
+          <div className="grid items-center gap-16 lg:grid-cols-[0.83fr_1.17fr]">
+            {/* Hero copy */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55 }}
+              className="relative z-10"
+            >
+              <div className="mb-7 flex items-center gap-3">
+                <span className="h-px w-8 bg-violet-500" />
+
+                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-violet-600">
+                  Built for students
+                </span>
+              </div>
+
+              <h1 className="max-w-2xl text-[52px] font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-[64px] lg:text-[72px]">
+                Your school life,
+                <span className="block text-violet-600">
+                  in sync.
+                </span>
+              </h1>
+
+              <p className="mt-7 max-w-xl text-[17px] leading-8 text-slate-500">
+                One calm place to manage assignments, plan your study time,
+                stay focused, understand your progress, and get help when you
+                need it.
+              </p>
+
+              <div className="mt-9 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="group flex items-center gap-2 rounded-xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-violet-700"
+                >
+                  Start for free
+                  <ArrowRight
+                    size={16}
+                    className="transition-transform group-hover:translate-x-1"
+                  />
+                </button>
+
+                <a
+                  href="#how-it-works"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <Play size={14} />
+                  See how it works
+                </a>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-[12px] font-medium text-slate-400">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-500" />
+                  Simple setup
+                </span>
+
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-500" />
+                  Student-first
+                </span>
+
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 size={15} className="text-emerald-500" />
+                  One workspace
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Product preview */}
+            <motion.div
+              initial={{ opacity: 0, x: 35 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.7, delay: 0.08 }}
+              className="relative"
+            >
+              <div className="absolute -inset-10 rounded-[4rem] bg-violet-300/15 blur-[80px]" />
+
+              <div className="relative rounded-[25px] border border-slate-200 bg-white p-2 shadow-[0_40px_120px_rgba(15,23,42,0.13)]">
+                <div className="overflow-hidden rounded-[19px] border border-slate-200 bg-[#f6f7f9]">
+                  {/* Browser chrome */}
+                  <div className="flex h-11 items-center justify-between border-b border-slate-200 bg-white px-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-slate-300" />
+                      <span className="h-2 w-2 rounded-full bg-slate-300" />
+                      <span className="h-2 w-2 rounded-full bg-slate-300" />
+                    </div>
+
+                    <div className="hidden h-6 w-48 items-center justify-center rounded-md bg-slate-50 text-[8px] font-medium text-slate-400 sm:flex">
+                      app.studysync.student
+                    </div>
+
+                    <div className="w-12" />
+                  </div>
+
+                  <div className="grid min-h-[490px] grid-cols-[72px_1fr] sm:grid-cols-[155px_1fr]">
+                    {/* Sidebar */}
+                    <aside className="border-r border-slate-200 bg-white p-3 sm:p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950 text-white">
+                          <GraduationCap size={14} />
+                        </div>
+
+                        <span className="hidden text-[10px] font-black sm:block">
+                          StudySync
+                        </span>
+                      </div>
+
+                      <div className="mt-8 space-y-1">
+                        {[
+                          ["Overview", true],
+                          ["Assignments", false],
+                          ["Planner", false],
+                          ["Focus", false],
+                          ["Community", false],
+                        ].map(([label, active]) => (
+                          <div
+                            key={label as string}
+                            className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-[9px] font-semibold ${
+                              active
+                                ? "bg-violet-50 text-violet-700"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                active ? "bg-violet-600" : "bg-slate-300"
+                              }`}
+                            />
+
+                            <span className="hidden sm:block">
+                              {label as string}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-8 hidden rounded-xl border border-slate-200 bg-slate-50 p-3 sm:block">
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                          Weekly goal
+                        </p>
+
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full w-[72%] rounded-full bg-violet-600" />
+                        </div>
+
+                        <div className="mt-2 flex justify-between text-[8px]">
+                          <span className="font-bold text-slate-700">
+                            8h 40m
+                          </span>
+                          <span className="text-slate-400">
+                            12h
+                          </span>
+                        </div>
+                      </div>
+                    </aside>
+
+                    {/* Main dashboard */}
+                    <div className="min-w-0 p-4 sm:p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Tuesday · September 30
+                          </p>
+
+                          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                            Good morning, Abhishek.
+                          </h3>
+                        </div>
+
+                        <div className="hidden h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 sm:block" />
+                      </div>
+
+                      {/* Stats */}
+                      <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+                        {stats.map(([label, value], index) => (
+                          <div
+                            key={label}
+                            className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4"
+                          >
+                            <p className="text-[7px] font-bold uppercase tracking-wider text-slate-400 sm:text-[8px]">
+                              {label}
+                            </p>
+
+                            <p
+                              className={`mt-2 text-sm font-black sm:text-lg ${
+                                index === 1
+                                  ? "text-emerald-500"
+                                  : "text-slate-950"
+                              }`}
+                            >
+                              {value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[1.1fr_0.9fr]">
+                        {/* Schedule */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                                Today
+                              </p>
+
+                              <h4 className="mt-1 text-[12px] font-black text-slate-900">
+                                Study schedule
+                              </h4>
+                            </div>
+
+                            <CalendarDays
+                              size={14}
+                              className="text-violet-500"
+                            />
+                          </div>
+
+                          <div className="mt-4 space-y-2.5">
+                            {schedule.map((item) => (
+                              <div
+                                key={item.time}
+                                className="flex items-center gap-2.5"
+                              >
+                                <span className="w-8 text-[7px] font-bold text-slate-400">
+                                  {item.time}
+                                </span>
+
+                                <div
+                                  className={`h-8 w-px ${
+                                    item.status === "active"
+                                      ? "bg-violet-500"
+                                      : "bg-slate-200"
+                                  }`}
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[9px] font-bold text-slate-800">
+                                    {item.subject}
+                                  </p>
+
+                                  <p className="truncate text-[8px] text-slate-400">
+                                    {item.topic}
+                                  </p>
+                                </div>
+
+                                {item.status === "completed" && (
+                                  <Check
+                                    size={12}
+                                    className="text-emerald-500"
+                                  />
+                                )}
+
+                                {item.status === "active" && (
+                                  <span className="rounded-md bg-violet-50 px-1.5 py-1 text-[7px] font-bold text-violet-600">
+                                    NOW
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* AI card */}
+                        <div className="relative overflow-hidden rounded-xl bg-slate-950 p-4 text-white">
+                          <div className="absolute right-[-25px] top-[-25px] h-24 w-24 rounded-full bg-violet-500/20 blur-2xl" />
+
+                          <div className="relative">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-500/15 text-violet-300">
+                                <Sparkles size={12} />
+                              </div>
+
+                              <span className="text-[9px] font-bold">
+                                StudySync AI
+                              </span>
+                            </div>
+
+                            <p className="mt-5 text-[10px] font-semibold leading-5 text-white">
+                              Your next best study session
+                            </p>
+
+                            <p className="mt-2 text-[9px] leading-5 text-slate-400">
+                              Physics has the closest deadline. A focused
+                              45-minute session tonight should keep you ahead.
+                            </p>
+
+                            <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3">
+                              <span className="text-[8px] text-slate-400">
+                                Physics · 45 min
+                              </span>
+
+                              <ArrowUpRight
+                                size={13}
+                                className="text-violet-300"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom progress */}
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp
+                              size={14}
+                              className="text-emerald-500"
+                            />
+
+                            <span className="text-[10px] font-bold text-slate-800">
+                              Weekly consistency
+                            </span>
+                          </div>
+
+                          <span className="text-[10px] font-black text-slate-950">
+                            78%
+                          </span>
+                        </div>
+
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full w-[78%] rounded-full bg-slate-950" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating detail */}
+              <div className="absolute -bottom-7 -left-5 hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/10 sm:block">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <CheckCircle2 size={17} />
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400">
+                      TODAY
+                    </p>
+
+                    <p className="mt-0.5 text-xs font-black text-slate-900">
+                      4 tasks completed
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            TRUST / POSITIONING
+        ========================================================== */}
+        <section className="border-y border-slate-200 bg-white">
+          <div className="mx-auto grid max-w-7xl gap-px bg-slate-200 sm:grid-cols-3">
+            {[
+              [
+                "One place",
+                "Assignments, planning, focus, and progress in one workspace.",
+              ],
+              [
+                "Less friction",
+                "Spend less time organizing schoolwork and more time learning.",
+              ],
+              [
+                "Built around you",
+                "Your subjects, workload, goals, and study habits shape the experience.",
+              ],
+            ].map(([title, description]) => (
+              <div
+                key={title}
+                className="bg-white px-6 py-8 sm:px-8"
+              >
+                <p className="text-sm font-black text-slate-950">
+                  {title}
+                </p>
+
+                <p className="mt-2 max-w-sm text-xs leading-6 text-slate-500">
+                  {description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* =========================================================
+            FEATURES
+        ========================================================== */}
+        <section
+          id="features"
+          className="mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-32"
+        >
+          <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr]">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="h-px w-7 bg-violet-600" />
+
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-600">
+                  Everything connected
+                </p>
+              </div>
+
+              <h2 className="mt-5 max-w-md text-4xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-5xl">
+                Schoolwork shouldn't feel scattered.
+              </h2>
+
+              <p className="mt-5 max-w-md text-sm leading-7 text-slate-500">
+                StudySync brings the pieces together so you can see what
+                matters, decide what comes next, and get back to studying.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => navigate("/signup")}
+                className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-slate-950 transition hover:text-violet-600"
+              >
+                Explore the workspace
+                <ArrowRight size={15} />
+              </button>
+            </div>
+
+            <div className="grid gap-px overflow-hidden rounded-3xl border border-slate-200 bg-slate-200 sm:grid-cols-2">
+              {features.map((feature, index) => {
+                const Icon = feature.icon;
+
+                return (
+                  <motion.div
+                    key={feature.title}
+                    initial={{ opacity: 0, y: 14 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-60px" }}
+                    transition={{ delay: index * 0.04 }}
+                    className="group bg-white p-7 transition hover:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-violet-100 group-hover:text-violet-700">
+                        <Icon size={18} />
+                      </div>
+
+                      <span className="text-[10px] font-black text-slate-300">
+                        {feature.number}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-6 text-sm font-black text-slate-950">
+                      {feature.title}
+                    </h3>
+
+                    <p className="mt-2 text-xs leading-6 text-slate-500">
+                      {feature.description}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            HOW IT WORKS
+        ========================================================== */}
+        <section
+          id="how-it-works"
+          className="border-y border-slate-200 bg-white"
+        >
+          <div className="mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-3">
+                <span className="h-px w-7 bg-violet-600" />
+
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-violet-600">
+                  How it works
+                </p>
+              </div>
+
+              <h2 className="mt-5 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl">
+                From a messy workload
+                <span className="text-violet-600"> to a clear next step.</span>
+              </h2>
+            </div>
+
+            <div className="mt-16 grid gap-0 border-y border-slate-200 md:grid-cols-4">
+              {[
+                [
+                  "01",
+                  BookOpen,
+                  "Add your work",
+                  "Keep assignments, deadlines, subjects, and academic tasks together.",
+                ],
+                [
+                  "02",
+                  CalendarDays,
+                  "Plan your time",
+                  "Turn the workload in front of you into realistic study sessions.",
+                ],
+                [
+                  "03",
+                  Target,
+                  "Focus",
+                  "Use Focus Mode to actually sit down and get the work done.",
+                ],
+                [
+                  "04",
+                  TrendingUp,
+                  "Understand progress",
+                  "See your consistency and learn what study habits are working.",
+                ],
+              ].map(([number, Icon, title, description], index) => {
+                const FeatureIcon = Icon as typeof BookOpen;
+
+                return (
+                  <div
+                    key={number as string}
+                    className={`relative border-slate-200 px-5 py-8 md:px-7 md:py-10 ${
+                      index < 3 ? "md:border-r" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-violet-600">
+                        {number as string}
+                      </span>
+
+                      <FeatureIcon
+                        size={17}
+                        className="text-slate-300"
+                      />
+                    </div>
+
+                    <h3 className="mt-9 text-sm font-black text-slate-950">
+                      {title as string}
+                    </h3>
+
+                    <p className="mt-3 text-xs leading-6 text-slate-500">
+                      {description as string}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            AI
+        ========================================================== */}
+        <section
+          id="ai"
+          className="mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-32"
+        >
+          <div className="relative overflow-hidden rounded-[32px] bg-[#10111a] shadow-[0_40px_100px_rgba(15,23,42,0.2)]">
+            <div className="absolute right-[-180px] top-[-220px] h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[100px]" />
+
+            <div className="absolute bottom-[-250px] left-[25%] h-[450px] w-[450px] rounded-full bg-blue-600/10 blur-[100px]" />
+
+            <div className="relative grid items-center gap-14 px-7 py-14 sm:px-10 lg:grid-cols-[0.85fr_1.15fr] lg:px-16 lg:py-20">
+              <div>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-violet-300">
+                  <Sparkles size={14} />
+                  StudySync AI
+                </div>
+
+                <h2 className="mt-6 max-w-lg text-4xl font-black leading-tight tracking-[-0.04em] text-white sm:text-5xl">
+                  An assistant that knows what you're studying.
+                </h2>
+
+                <p className="mt-6 max-w-lg text-sm leading-7 text-slate-400">
+                  Instead of giving you generic answers, StudySync AI can work
+                  from your academic context to help you decide what to study,
+                  understand difficult topics, organize assignments, and plan
+                  your next session.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-violet-50"
+                >
+                  Try StudySync AI
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+
+              {/* AI conversation */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
+                      <Sparkles size={13} />
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold text-white">
+                        StudySync AI
+                      </p>
+
+                      <p className="text-[8px] text-slate-500">
+                        Academic assistant
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="flex items-center gap-1.5 text-[8px] text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    Ready
+                  </span>
+                </div>
+
+                <div className="space-y-4 py-5">
+                  <div className="max-w-[72%] rounded-2xl rounded-tl-md bg-white/[0.08] px-4 py-3 text-xs leading-5 text-slate-300">
+                    What should I study tonight?
+                  </div>
+
+                  <div className="ml-auto max-w-[86%] rounded-2xl rounded-tr-md bg-violet-600 px-4 py-3 text-xs leading-5 text-white">
+                    You have a Physics project due tomorrow and a Math
+                    assignment due Friday. I recommend starting with Physics
+                    while you have the most energy.
+                  </div>
+
+                  <div className="rounded-xl border border-violet-400/20 bg-violet-500/[0.08] p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-violet-300">
+                          Recommended
+                        </p>
+
+                        <p className="mt-1 text-xs font-bold text-white">
+                          Physics · Mechanics
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                        <Clock3 size={12} />
+                        45 min
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                  <span className="flex-1 text-[9px] text-slate-600">
+                    Ask StudySync AI...
+                  </span>
+
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600 text-white">
+                    <ArrowRight size={12} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            FINAL CTA
+        ========================================================== */}
+        <section className="border-t border-slate-200 bg-white">
+          <div className="mx-auto max-w-4xl px-5 py-24 text-center sm:px-6 lg:py-32">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
+              <Target size={20} />
+            </div>
+
+            <h2 className="mx-auto mt-7 max-w-2xl text-4xl font-black leading-tight tracking-[-0.045em] text-slate-950 sm:text-5xl">
+              Spend less time managing school.
+              <span className="block text-violet-600">
+                Spend more time learning.
+              </span>
+            </h2>
+
+            <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-slate-500">
+              Bring assignments, study plans, focus sessions, progress, and
+              academic help together in one student workspace.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => navigate("/signup")}
+              className="group mt-8 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-violet-700"
+            >
+              Create your workspace
+              <ArrowRight
+                size={16}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </button>
+
+            <p className="mt-4 text-[11px] font-medium text-slate-400">
+              Simple setup · Student-focused · Built for everyday school life
+            </p>
+          </div>
+        </section>
+      </main>
+
+      {/* =========================================================
+          FOOTER
+      ========================================================== */}
+      <footer className="bg-[#0b0d12] text-white">
+        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-6 lg:px-8">
+          <div className="grid gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+            {/* Brand */}
+            <div>
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="flex items-center gap-3"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-950">
+                  <GraduationCap size={19} />
+                </div>
+
+                <span className="text-xl font-black tracking-tight">
+                  Study<span className="text-violet-400">Sync</span>
+                </span>
+              </button>
+
+              <p className="mt-5 max-w-sm text-sm leading-6 text-slate-500">
+                A focused student workspace for managing schoolwork, planning
+                study time, staying consistent, and learning with more clarity.
+              </p>
+            </div>
+
+            {/* Product */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-[0.18em] text-white">
+                Product
+              </h3>
+
+              <div className="mt-5 space-y-3 text-sm">
+                <a
+                  href="#features"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  Features
+                </a>
+
+                <a
+                  href="#how-it-works"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  How it works
+                </a>
+
+                <a
+                  href="#ai"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  StudySync AI
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="block text-left text-slate-500 transition hover:text-white"
+                >
+                  Get started
+                </button>
+              </div>
+            </div>
+
+            {/* Workspace */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-[0.18em] text-white">
+                Workspace
+              </h3>
+
+              <div className="mt-5 space-y-3 text-sm">
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  Log in
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="block text-left text-slate-500 transition hover:text-white"
+                >
+                  Create account
+                </button>
+
+                <a
+                  href="#features"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  Student tools
+                </a>
+              </div>
+            </div>
+
+            {/* StudySync */}
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-[0.18em] text-white">
+                StudySync
+              </h3>
+
+              <div className="mt-5 space-y-3 text-sm">
+                <a
+                  href="#how-it-works"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  About
+                </a>
+
+                <a
+                  href="#features"
+                  className="block text-slate-500 transition hover:text-white"
+                >
+                  For students
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/signup")}
+                  className="block text-left text-slate-500 transition hover:text-white"
+                >
+                  Join StudySync
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="my-10 h-px bg-white/[0.08]" />
+
+          <div className="flex flex-col gap-3 text-[11px] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              © {new Date().getFullYear()} StudySync. All rights reserved.
+            </p>
+
+            <p>
+              Student productivity workspace · Made for learning
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

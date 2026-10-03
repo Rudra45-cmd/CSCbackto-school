@@ -70,6 +70,7 @@ function getPriorityClasses(priority: string) {
 }
 
 export default function StudyPlanner() {
+
   const navigate = useNavigate();
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);

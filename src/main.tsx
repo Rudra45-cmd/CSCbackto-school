@@ -2,9 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { StudentProfileProvider } from './context/StudentProfileContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <StudentProfileProvider>
+      <App />
+    </StudentProfileProvider>
   </StrictMode>,
 )

@@ -1,332 +1,224 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
-  CalendarDays,
   Check,
+  RefreshCw,
   Megaphone,
-  Search,
 } from "lucide-react";
+import { apiFetch } from "../lib/api";
+import { getToken } from "../lib/auth";
 
-interface Announcement {
+type Announcement = {
   id: number;
   title: string;
   content: string;
-  category: "School" | "Academic" | "Event" | "System";
-  date: string;
-  important: boolean;
+  created_at: string;
+  created_by: string;
   read: boolean;
+};
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
-const INITIAL_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: 1,
-    title: "Upcoming examination schedule",
-    content:
-      "The examination schedule has been updated. Check your academic calendar and plan your revision sessions accordingly.",
-    category: "Academic",
-    date: "Today",
-    important: true,
-    read: false,
-  },
-  {
-    id: 2,
-    title: "New study resources available",
-    content:
-      "New learning resources have been added for Mathematics, Physics, Chemistry, and English.",
-    category: "School",
-    date: "Yesterday",
-    important: false,
-    read: false,
-  },
-  {
-    id: 3,
-    title: "Student community update",
-    content:
-      "You can now share study questions and discuss subjects with other students through the Community section.",
-    category: "System",
-    date: "2 days ago",
-    important: false,
-    read: true,
-  },
-  {
-    id: 4,
-    title: "Science project submission",
-    content:
-      "Remember to complete and submit your science project before the deadline shown in Assignments.",
-    category: "Event",
-    date: "3 days ago",
-    important: true,
-    read: true,
-  },
-];
-
-const CATEGORIES = [
-  "All",
-  "School",
-  "Academic",
-  "Event",
-  "System",
-] as const;
-
 export default function Announcements() {
-  const [announcements, setAnnouncements] = useState(
-    INITIAL_ANNOUNCEMENTS,
-  );
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [category, setCategory] =
-    useState<(typeof CATEGORIES)[number]>("All");
+  const unread = announcements.filter((item) => !item.read).length;
 
-  const [search, setSearch] = useState("");
+  const loadAnnouncements = useCallback(async () => {
+    if (!getToken()) return;
 
-  const unreadCount = announcements.filter(
-    (item) => !item.read,
-  ).length;
+    try {
+      const response = await apiFetch<{
+        announcements: Announcement[];
+      }>("/api/announcements", {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
 
-  const filteredAnnouncements = useMemo(() => {
-    const query = search.trim().toLowerCase();
+      setAnnouncements(response.announcements);
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError("Could not load announcements right now.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    return announcements.filter((item) => {
-      const matchesCategory =
-        category === "All" || item.category === category;
+  useEffect(() => {
+    void loadAnnouncements();
 
-      const matchesSearch =
-        !query ||
-        item.title.toLowerCase().includes(query) ||
-        item.content.toLowerCase().includes(query);
+    const interval = window.setInterval(() => {
+      void loadAnnouncements();
+    }, 3000);
 
-      return matchesCategory && matchesSearch;
-    });
-  }, [announcements, category, search]);
+    return () => window.clearInterval(interval);
+  }, [loadAnnouncements]);
 
-  function markRead(id: number) {
-    setAnnouncements((current) =>
-      current.map((item) =>
-        item.id === id
-          ? { ...item, read: true }
-          : item,
-      ),
-    );
-  }
+  async function markRead(id: number) {
+    try {
+      await apiFetch(`/api/announcements/${id}/read`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
 
-  function markAllRead() {
-    setAnnouncements((current) =>
-      current.map((item) => ({
-        ...item,
-        read: true,
-      })),
-    );
-  }
-
-  function categoryClass(value: string) {
-    switch (value) {
-      case "Academic":
-        return "bg-violet-50 text-violet-600";
-      case "Event":
-        return "bg-sky-50 text-sky-600";
-      case "System":
-        return "bg-emerald-50 text-emerald-600";
-      default:
-        return "bg-amber-50 text-amber-600";
+      setAnnouncements((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                read: true,
+              }
+            : item,
+        ),
+      );
+    } catch (err) {
+      console.error(err);
     }
   }
 
   return (
-    <div className="min-h-full bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        {/* Header */}
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-violet-500">
-              <Megaphone size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em]">
-                Announcements
-              </span>
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-br from-violet-500/10 via-white to-cyan-500/10 p-7 sm:p-8">
+          <div className="flex items-start gap-4">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+              <Bell size={22} />
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
             </div>
 
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Stay up to date.
-            </h1>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-violet-500">
+                Updates
+              </p>
+              <h1 className="mt-1 text-2xl font-bold text-slate-900">
+                Announcements
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Important updates from your school and StudySync.
+              </p>
+            </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Important school, academic, event, and StudySync updates.
-            </p>
-          </div>
-
-          {unreadCount > 0 && (
             <button
               type="button"
-              onClick={markAllRead}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+              onClick={() => void loadAnnouncements()}
+              className="ml-auto hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:flex"
+              title="Refresh announcements"
             >
-              <Check size={14} />
-              Mark all as read
+              <RefreshCw size={16} />
             </button>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-7 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
-            <Bell size={18} className="text-violet-500" />
-
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Total
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              {announcements.length}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-            <Bell size={18} className="text-amber-500" />
-
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Unread
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              {unreadCount}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
-            <Check size={18} className="text-emerald-500" />
-
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Read
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              {announcements.length - unreadCount}
-            </p>
           </div>
         </div>
+      </section>
 
-        {/* Search + Filters */}
-        <div className="mt-7 flex flex-col gap-3 lg:flex-row">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-
-            <input
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Search announcements..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {CATEGORIES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setCategory(item)}
-                className={`whitespace-nowrap rounded-xl px-4 py-3 text-xs font-semibold transition ${
-                  category === item
-                    ? "bg-violet-600 text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-600"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
         </div>
+      )}
 
-        {/* Feed */}
-        <section className="mt-5 space-y-3">
-          {filteredAnnouncements.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-14 text-center">
-              <Megaphone
-                size={24}
-                className="mx-auto text-slate-300"
-              />
-
-              <p className="mt-4 text-sm font-bold text-slate-800">
-                No announcements found
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Try another search or category.
-              </p>
-            </div>
-          ) : (
-            filteredAnnouncements.map((announcement) => (
-              <article
-                key={announcement.id}
-                onClick={() => markRead(announcement.id)}
-                className={`cursor-pointer rounded-3xl border bg-white p-5 shadow-sm transition hover:border-violet-200 sm:p-6 ${
-                  announcement.read
-                    ? "border-slate-200"
-                    : "border-violet-200 shadow-violet-500/5"
-                }`}
-              >
-                <div className="flex gap-4">
-                  <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                      announcement.read
-                        ? "bg-slate-100 text-slate-400"
-                        : "bg-violet-50 text-violet-600"
-                    }`}
-                  >
-                    <Megaphone size={18} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-md px-2 py-1 text-[9px] font-bold ${categoryClass(
-                          announcement.category,
-                        )}`}
-                      >
-                        {announcement.category}
-                      </span>
-
-                      {announcement.important && (
-                        <span className="rounded-md bg-red-50 px-2 py-1 text-[9px] font-bold text-red-500">
-                          Important
-                        </span>
-                      )}
-
-                      {!announcement.read && (
-                        <span className="flex items-center gap-1 text-[9px] font-bold text-violet-500">
-                          <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-                          New
-                        </span>
-                      )}
-                    </div>
-
-                    <h2
-                      className={`mt-3 text-base font-bold ${
-                        announcement.read
-                          ? "text-slate-800"
-                          : "text-slate-900"
-                      }`}
-                    >
-                      {announcement.title}
-                    </h2>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {announcement.content}
-                    </p>
-
-                    <div className="mt-4 flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
-                      <CalendarDays size={12} />
-                      {announcement.date}
-                    </div>
-                  </div>
+      {loading ? (
+        <div className="rounded-[26px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+          Loading announcements...
+        </div>
+      ) : announcements.length === 0 ? (
+        <div className="rounded-[26px] border border-dashed border-slate-300 bg-white p-12 text-center">
+          <Megaphone
+            className="mx-auto text-slate-300"
+            size={34}
+          />
+          <h2 className="mt-3 font-semibold text-slate-800">
+            No announcements yet
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            New announcements from your school will appear here.
+          </p>
+        </div>
+      ) : (
+        <section className="space-y-4">
+          {announcements.map((announcement) => (
+            <article
+              key={announcement.id}
+              className={`rounded-[26px] border bg-white p-5 shadow-sm transition sm:p-6 ${
+                announcement.read
+                  ? "border-slate-200"
+                  : "border-violet-200 ring-1 ring-violet-100"
+              }`}
+            >
+              <div className="flex gap-4">
+                <div
+                  className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    announcement.read
+                      ? "bg-slate-100 text-slate-500"
+                      : "bg-violet-100 text-violet-600"
+                  }`}
+                >
+                  <Megaphone size={18} />
                 </div>
-              </article>
-            ))
-          )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-slate-900">
+                          {announcement.title}
+                        </h2>
+
+                        {!announcement.read && (
+                          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-600">
+                            New
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        {announcement.created_by} ·{" "}
+                        {formatDate(announcement.created_at)}
+                      </p>
+                    </div>
+
+                    {!announcement.read && (
+                      <button
+                        type="button"
+                        onClick={() => void markRead(announcement.id)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700"
+                      >
+                        <Check size={14} />
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                    {announcement.content}
+                  </p>
+
+                  {announcement.read && (
+                    <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                      <Check size={13} />
+                      Read
+                    </p>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
         </section>
-      </div>
+      )}
     </div>
   );
 }

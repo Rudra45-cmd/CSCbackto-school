@@ -119,6 +119,7 @@ function formatDueDate(dueDate: string, completed: boolean) {
 }
 
 export default function Assignments() {
+
   const navigate = useNavigate();
   const token = getToken();
 

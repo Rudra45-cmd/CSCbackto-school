@@ -1,0 +1,1164 @@
+import { useStudentProfile } from "./context/StudentProfileContext";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import MyLearning from "./pages/MyLearning";
+import Assignments from "./pages/Assignments";
+import StudyPlanner from "./pages/StudyPlanner";
+import FocusMode from "./pages/FocusMode";
+import Community from "./pages/Community";
+import Announcements from "./pages/Announcements";
+import Profile from "./pages/Profile";
+import SettingsPage from "./pages/SettingsPage";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import LandingPage from "./pages/LandingPage";
+import Onboarding from "./pages/Onboarding";
+import { getCurrentUser, logout } from "./lib/auth";
+import { apiFetch } from "./lib/api";
+import { ASSIGNMENTS_CHANGED_EVENT, STUDY_SESSIONS_CHANGED_EVENT } from "./lib/assignmentSync";
+import {
+  Bell,
+  BookOpen,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Flame,
+  GraduationCap,
+  LayoutDashboard,
+  Menu,
+  Moon,
+  MoreHorizontal,
+  Search,
+  Settings,
+  Sparkles,
+  Target,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
+type NavItem = {
+  label: string;
+  icon: typeof LayoutDashboard;
+};
+const navItems: NavItem[] = [
+  { label: "Dashboard", icon: LayoutDashboard },
+  { label: "StudySync AI", icon: BookOpen },
+  { label: "Assignments", icon: FileText },
+  { label: "Study Planner", icon: CalendarDays },
+  { label: "Focus Mode", icon: Target },
+];
+type DashboardAssignment = {
+  id: number;
+  subject: string;
+  title: string;
+  due: string;
+  progress: number;
+  color: string;
+  completed: boolean;
+  estimated_minutes: number;
+  priority: string;
+};
+type BackendAssignment = {
+  id: number;
+  title: string;
+  subject: string;
+  assignment_type: string;
+  description: string;
+  due_date: string;
+  priority: string;
+  estimated_minutes: number;
+  add_to_plan: boolean;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string | null;
+};
+type AssignmentsResponse = {
+  assignments: BackendAssignment[];
+};
+
+type DashboardStudySession = {
+  id: number;
+  subject: string;
+  duration_minutes: number;
+  duration_seconds: number;
+  started_at: string;
+  ended_at: string | null;
+  assignment_id: number | null;
+};
+
+type StudySessionsResponse = {
+  sessions: DashboardStudySession[];
+};
+
+function formatStudyDuration(totalSeconds: number): string {
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
+function parseDailyGoalMinutes(value: string | undefined): number {
+  if (!value) return 120;
+
+  const normalized = value.trim().toLowerCase();
+
+  const hours = normalized.match(
+    /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)/
+  );
+
+  if (hours) {
+    return Math.max(1, Math.round(Number(hours[1]) * 60));
+  }
+
+  const minutes = normalized.match(
+    /(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)/
+  );
+
+  if (minutes) {
+    return Math.max(1, Math.round(Number(minutes[1])));
+  }
+
+  const numeric = normalized.match(/\d+(?:\.\d+)?/);
+
+  if (numeric) {
+    return Math.max(1, Math.round(Number(numeric[0]) * 60));
+  }
+
+  return 120;
+}
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="*" element={<StudySyncApp />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+function StudySyncApp() {
+
+  // Header controls
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("studysync_theme") === "dark";
+  });
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (darkMode) {
+      root.classList.add("dark");
+      localStorage.setItem("studysync_theme", "dark");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("studysync_theme", "light");
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      if (!target.closest("[data-notification-area]")) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [notificationsOpen]);
+
+  const studyNotifications = [
+    {
+      id: 1,
+      title: "Study reminder",
+      message: "You have study time scheduled for today.",
+      time: "Now",
+      color: "violet",
+    },
+    {
+      id: 2,
+      title: "Assignment update",
+      message: "Check your upcoming assignments and deadlines.",
+      time: "Today",
+      color: "blue",
+    },
+    {
+      id: 3,
+      title: "Keep your streak going",
+      message: "Complete a Focus session to keep building consistency.",
+      time: "Today",
+      color: "emerald",
+    },
+  ];
+
+  const { student: sharedStudent } = useStudentProfile();
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [studentName, setStudentName] = useState("Student");
+  const student = sharedStudent;
+  const [workspaceReady, setWorkspaceReady] = useState(
+    () => localStorage.getItem("studysync_workspace_ready") === "true"
+  );
+  const active =
+    location.pathname === "/learning"
+      ? "StudySync AI"
+      : location.pathname === "/assignments"
+        ? "Assignments"
+        : location.pathname === "/planner"
+          ? "Study Planner"
+          : location.pathname === "/focus"
+            ? "Focus Mode"
+          : location.pathname === "/community"
+            ? "Class Community"
+            : location.pathname === "/announcements"
+              ? "Announcements"
+            : location.pathname === "/settings"
+              ? "Settings"
+              : "Dashboard";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dashboardAssignments, setDashboardAssignments] = useState<DashboardAssignment[]>([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [dashboardSessions, setDashboardSessions] = useState<DashboardStudySession[]>([]);
+  const assignmentStats = {
+    total: dashboardAssignments.length,
+    completed: dashboardAssignments.filter((item) => item.completed).length,
+    today: dashboardAssignments.filter(
+      (item) =>
+        !item.completed &&
+        item.due.toLowerCase().includes("today"),
+    ).length,
+    overdue: dashboardAssignments.filter(
+      (item) =>
+        !item.completed &&
+        item.due.toLowerCase().includes("overdue"),
+    ).length,
+  };
+  const assignmentCompletion =
+    assignmentStats.total > 0
+      ? Math.round(
+          (assignmentStats.completed / assignmentStats.total) * 100,
+        )
+      : 0;
+
+  const now = new Date();
+  const todayKey = now.toLocaleDateString("en-CA");
+
+  const startOfWeek = new Date(now);
+  const day = startOfWeek.getDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
+
+  const todaySessions = dashboardSessions.filter(
+    (session) =>
+      new Date(session.started_at).toLocaleDateString("en-CA") === todayKey,
+  );
+
+  const weeklySessions = dashboardSessions.filter(
+    (session) => new Date(session.started_at) >= startOfWeek,
+  );
+
+  const todayFocusSeconds = todaySessions.reduce(
+    (total, session) => total + session.duration_seconds,
+    0,
+  );
+
+  const weeklyFocusSeconds = weeklySessions.reduce(
+    (total, session) => total + session.duration_seconds,
+    0,
+  );
+
+  const studyDays = new Set(
+    dashboardSessions.map((session) =>
+      new Date(session.started_at).toLocaleDateString("en-CA"),
+    ),
+  );
+
+  let studyStreak = 0;
+  const streakCursor = new Date(now);
+
+  streakCursor.setHours(0, 0, 0, 0);
+
+  while (studyDays.has(streakCursor.toLocaleDateString("en-CA"))) {
+    studyStreak += 1;
+    streakCursor.setDate(streakCursor.getDate() - 1);
+  }
+
+  const dailyGoalMinutes = parseDailyGoalMinutes(student?.daily_goal);
+
+  const weeklyGoalSeconds = dailyGoalMinutes * 60 * 7;
+
+  const weeklyGoalProgress = Math.min(
+    100,
+    Math.round((weeklyFocusSeconds / weeklyGoalSeconds) * 100),
+  );
+
+  const learningScore = Math.round(
+    assignmentCompletion * 0.6 + weeklyGoalProgress * 0.4,
+  );
+
+  const assignmentFocusSeconds = dashboardSessions.reduce<
+    Record<number, number>
+  >((totals, session) => {
+    if (session.assignment_id !== null) {
+      totals[session.assignment_id] =
+        (totals[session.assignment_id] || 0) + session.duration_seconds;
+    }
+    return totals;
+  }, {});
+  useEffect(() => {
+    async function loadDashboardAssignments() {
+      const token = localStorage.getItem("studysync_access_token");
+      if (!token) return;
+      try {
+        setAssignmentsLoading(true);
+        const response = await apiFetch<AssignmentsResponse>("/api/assignments", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const colors = ["violet", "cyan", "emerald", "orange"];
+        const mapped = response.assignments.map((item, index) => {
+          let progress = item.completed ? 100 : 0;
+          if (!item.completed && item.add_to_plan) {
+            progress = 25;
+          }
+          return {
+            id: item.id,
+            subject: item.subject,
+            title: item.title,
+            due: item.due_date || "No due date",
+            progress,
+            color: colors[index % colors.length],
+            completed: item.completed,
+            estimated_minutes: item.estimated_minutes,
+            priority: item.priority,
+          };
+        });
+        setDashboardAssignments(mapped);
+      } catch {
+        setDashboardAssignments([]);
+      } finally {
+        setAssignmentsLoading(false);
+      }
+    }
+    loadDashboardAssignments();
+
+    async function loadDashboardSessions() {
+      const token = localStorage.getItem("studysync_access_token");
+      if (!token) return;
+
+      try {
+        const response = await apiFetch<StudySessionsResponse>(
+          "/api/study-sessions",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        setDashboardSessions(response.sessions);
+      } catch {
+        setDashboardSessions([]);
+      }
+    }
+
+    loadDashboardSessions();
+
+    async function validateSession() {
+      try {
+        const user = await getCurrentUser();
+  
+        setStudentName(user.name);
+        setAuthenticated(true);
+      } catch {
+        logout();
+        setAuthenticated(false);
+      } finally {
+        setCheckingAuth(false);
+      }
+    }
+    validateSession();
+    
+    const refreshAssignments: () => void = () => {
+      void loadDashboardAssignments();
+    };
+
+    const refreshSessions: () => void = () => {
+      void loadDashboardSessions();
+    };
+
+    window.addEventListener(
+      ASSIGNMENTS_CHANGED_EVENT,
+      refreshAssignments,
+    );
+
+    window.addEventListener(
+      STUDY_SESSIONS_CHANGED_EVENT,
+      refreshSessions,
+    );
+
+    return () => {
+      window.removeEventListener(
+        ASSIGNMENTS_CHANGED_EVENT,
+        refreshAssignments,
+      );
+
+      window.removeEventListener(
+        STUDY_SESSIONS_CHANGED_EVENT,
+        refreshSessions,
+      );
+    };
+
+  }, []);
+
+
+
+
+
+  if (checkingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-slate-600">
+        Checking your StudySync session...
+      </div>
+    );
+  }
+  if (!authenticated && !workspaceReady) {
+    if (location.pathname === "/login") {
+      return (
+        <Login
+          onLogin={(name) => {
+            setStudentName(name);
+            setAuthenticated(true);
+            navigate("/");
+          }}
+        />
+      );
+    }
+    return <LandingPage />;
+  }
+  return (
+    <div className="studysync-ambient min-h-screen bg-[#f5f7fb] text-slate-900">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <button
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close navigation"
+        />
+      )}
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[260px] flex-col overflow-y-auto border-r border-slate-200 bg-[#090914]/95 px-4 py-4 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="mb-5 flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/20">
+              <GraduationCap size={22} />
+            </div>
+            <div>
+              <h1 className="text-[17px] font-bold tracking-tight">StudySync</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                School
+              </p>
+            </div>
+          </div>
+          <button
+            className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X size={19} />
+          </button>
+        </div>
+        <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+          Workspace
+        </div>
+        <nav className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const selected = active === item.label;
+            return (
+              <button
+                key={item.label}
+                onClick={() => {
+                  setSidebarOpen(false);
+                  if (item.label === "Dashboard") navigate("/");
+                  if (item.label === "StudySync AI") navigate("/learning");
+                  if (item.label === "Assignments") navigate("/assignments");
+                  if (item.label === "Study Planner") navigate("/planner");
+                  if (item.label === "Focus Mode") navigate("/focus");
+                  if (item.label === "Class Community") navigate("/community");
+                  if (item.label === "Announcements") navigate("/announcements");
+                }}
+                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${
+                  selected
+                    ? "bg-violet-500/12 text-violet-300 ring-1 ring-violet-500/20"
+                    : "text-slate-500 hover:bg-white hover:text-slate-700"
+                }`}
+              >
+                <Icon size={18} className={selected ? "text-violet-400" : ""} />
+                {item.label}
+                {selected && (
+                  <motion.div
+                    layoutId="nav-dot"
+                    className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-400"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+          Community
+        </div>
+        <nav className="mt-2 space-y-1">
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              navigate("/community");
+            }}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              active === "Class Community"
+                ? "bg-violet-500/12 text-violet-300 ring-1 ring-violet-500/20"
+                : "text-slate-500 hover:bg-white hover:text-slate-700"
+            }`}
+          >
+            <Users size={18} className={active === "Class Community" ? "text-violet-400" : ""} />
+            Class Community
+          </button>
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              navigate("/announcements");
+            }}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              active === "Announcements"
+                ? "bg-violet-500/12 text-violet-300 ring-1 ring-violet-500/20"
+                : "text-slate-500 hover:bg-white hover:text-slate-700"
+            }`}
+          >
+            <Bell size={18} className={active === "Announcements" ? "text-violet-400" : ""} />
+            Announcements
+          </button>
+        </nav>
+        <div className="mt-auto">
+          <div className="mb-2 rounded-2xl border border-violet-500/15 bg-gradient-to-br from-violet-500/10 to-cyan-500/5 p-3">
+            <div className="mb-2 flex items-center gap-2 text-violet-300">
+              <Sparkles size={16} />
+              <span className="text-xs font-semibold">StudySync AI</span>
+            </div>
+            <p className="text-xs leading-5 text-slate-500">
+              Ask your AI study companion anything about your learning.
+            </p>
+            <button
+              onClick={() => navigate("/learning")}
+              className="mt-3 flex items-center gap-1 text-xs font-semibold text-slate-900"
+            >
+              Open assistant <ChevronRight size={13} />
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              navigate("/settings");
+            }}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              active === "Settings"
+                ? "bg-violet-500/12 text-violet-300 ring-1 ring-violet-500/20"
+                : "text-slate-500 hover:bg-white hover:text-slate-700"
+            }`}
+          >
+            <Settings size={18} />
+            Settings
+          </button>
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              navigate("/profile");
+            }}
+            className="mt-3 flex w-full items-center gap-3 border-t border-white/[0.06] px-2 pt-3 text-left transition hover:opacity-80"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 text-xs font-bold">
+              {studentName
+                .split(" ")
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{studentName}</p>
+              <p className="text-[11px] text-slate-600">{student?.grade || "Grade not set"}</p>
+            </div>
+          </button>
+          <button
+            onClick={() => {
+              logout();
+              localStorage.removeItem("studysync_workspace_ready");
+              localStorage.removeItem("studysync_onboarding");
+              setAuthenticated(false);
+              setWorkspaceReady(false);
+              void 0;
+              setStudentName("Student");
+              setSidebarOpen(false);
+              navigate("/", { replace: true });
+            }}
+            className="mt-3 w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-500 transition hover:bg-red-500/10 hover:text-red-300"
+          >
+            Log out
+          </button>
+        </div>
+      </aside>
+      {/* Main */}
+      <main className="h-screen overflow-y-auto lg:pl-[260px]">
+        <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#f5f7fb]/80 px-5 py-4 backdrop-blur-xl sm:px-8">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              className="rounded-xl border border-slate-200 p-2.5 text-slate-500 lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <div className="relative hidden max-w-md flex-1 md:block">
+              <Search
+                size={17}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"
+              />
+              <input
+                placeholder="Search anything..."
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-500/40"
+              />
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                /
+              </kbd>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <div className="relative flex items-center gap-3" data-notification-area>
+              <button
+                type="button"
+                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+                title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+                onClick={() => setDarkMode((current) => !current)}
+                className="group flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-500/40 dark:hover:bg-violet-950/40"
+              >
+                <Moon
+                  size={19}
+                  className="transition-transform duration-300 group-hover:rotate-[-18deg]"
+                />
+              </button>
+
+              <button
+                type="button"
+                aria-label="Open notifications"
+                aria-expanded={notificationsOpen}
+                title="Notifications"
+                onClick={() =>
+                  setNotificationsOpen((current) => !current)
+                }
+                className="group relative flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-500/40 dark:hover:bg-violet-950/40"
+              >
+                <Bell
+                  size={19}
+                  className="transition-transform duration-300 group-hover:rotate-[-8deg]"
+                />
+
+                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-violet-500 dark:border-slate-900" />
+              </button>
+
+              {notificationsOpen && (
+                <div
+                  data-notification-area
+                  className="absolute right-0 top-[calc(100%+12px)] z-[9999] w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/30 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/30"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 dark:border-slate-800">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                        Notifications
+                      </h3>
+                      <p className="mt-0.5 text-[11px] text-slate-400">
+                        Your latest StudySync updates
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-600 dark:bg-violet-950/40 dark:text-violet-300">
+                      3 new
+                    </span>
+                  </div>
+
+                  <div className="max-h-[310px] overflow-y-auto">
+                    {studyNotifications.map((notification) => (
+                      <button
+                        key={notification.id}
+                        type="button"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="flex w-full gap-3 border-b border-slate-100 px-4 py-4 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+                      >
+                        <span
+                          className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                            notification.color === "violet"
+                              ? "bg-violet-500"
+                              : notification.color === "blue"
+                                ? "bg-blue-500"
+                                : "bg-emerald-500"
+                          }`}
+                        />
+
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="text-xs font-bold text-slate-800 dark:text-white">
+                              {notification.title}
+                            </span>
+
+                            <span className="shrink-0 text-[9px] text-slate-400">
+                              {notification.time}
+                            </span>
+                          </span>
+
+                          <span className="mt-1 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                            {notification.message}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-slate-100 p-3 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotificationsOpen(false);
+                        navigate("/announcements");
+                      }}
+                      className="w-full rounded-xl bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-600 transition hover:bg-violet-100 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-950/60"
+                    >
+                      View all notifications
+                    </button>
+                  </div>
+                </div>
+              )}
+)}
+            </div>
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:px-10">
+          <Routes>
+            <Route path="/learning" element={<MyLearning />} />
+            <Route path="/assignments" element={<Assignments />} />
+            <Route path="/planner" element={<StudyPlanner />} />
+            <Route path="/focus" element={<FocusMode />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/announcements" element={<Announcements />} />
+          <Route
+            path="/settings"
+            element={<SettingsPage />}
+          />
+          <Route
+            path="/profile"
+            element={
+              <Profile
+              />
+            }
+          />
+            <Route path="/" element={
+              <>
+          <section className="mb-7">
+            <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-violet-500/[0.10] via-white/[0.025] to-cyan-500/[0.05] p-6 sm:p-7">
+              <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-violet-500/10 blur-3xl" />
+              <div className="absolute -bottom-28 right-28 h-52 w-52 rounded-full bg-cyan-400/[0.06] blur-3xl" />
+              <div className="relative flex flex-col gap-7 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-violet-400">
+                    <Zap size={13} />
+                    {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+                  </p>
+                  <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                    Good evening, {studentName}.
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                    Your learning workspace is ready. Stay consistent, finish
+                    your priorities, and keep your streak alive.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => navigate("/assignments")}
+                      className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-black transition hover:bg-slate-200"
+                    >
+                      <CheckCircle2 size={15} />
+                      View assignments
+                    </button>
+                    <button
+                      onClick={() => navigate("/focus")}
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-white"
+                    >
+                      <Target size={15} />
+                      Start focus
+                    </button>
+                  </div>
+                </div>
+                <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:w-[360px]">
+                  <div className="rounded-2xl border border-slate-200 bg-black/15 p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                      Today
+                    </p>
+                    <p className="mt-2 text-xl font-bold text-slate-900">
+                      {formatStudyDuration(todayFocusSeconds)}
+                    </p>
+                    <p className="mt-1 text-[10px] text-emerald-400">
+                      {todaySessions.length}{" "}
+                      {todaySessions.length === 1 ? "session" : "sessions"} today
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-black/15 p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                      Goal
+                    </p>
+                    <p className="mt-2 text-xl font-bold text-slate-900">{student?.daily_goal || "2 hours"}</p>
+                    <p className="mt-1 text-[10px] text-cyan-400">
+                      Daily study target
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-2xl border border-slate-200 bg-black/15 p-4 sm:col-span-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                      Streak
+                    </p>
+                    <p className="mt-2 text-xl font-bold text-slate-900">
+                      {studyStreak}{" "}
+                      {studyStreak === 1 ? "day" : "days"}
+                    </p>
+                    <p className="mt-1 text-[10px] text-orange-400">
+                      {studyStreak > 0
+                        ? "Current study streak"
+                        : "Begin with Focus Mode"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          {/* Stats */}
+          <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              icon={<Flame size={19} />}
+              label="Study streak"
+              value={`${studyStreak} ${studyStreak === 1 ? "day" : "days"}`}
+              detail={
+                studyStreak > 0
+                  ? "Keep studying each day"
+                  : "Start a focus session"
+              }
+              accent="orange"
+            />
+            <StatCard
+              icon={<Target size={19} />}
+              label="Weekly focus"
+              value={formatStudyDuration(weeklyFocusSeconds)}
+              detail={`${weeklySessions.length} ${
+                weeklySessions.length === 1 ? "session" : "sessions"
+              } this week`}
+              accent="violet"
+            />
+            <StatCard
+              icon={<CheckCircle2 size={19} />}
+              label="Completed"
+              value={`${assignmentStats.completed} / ${assignmentStats.total}`}
+              detail={
+                assignmentStats.total - assignmentStats.completed > 0
+                  ? `${assignmentStats.total - assignmentStats.completed} ${
+                      assignmentStats.total - assignmentStats.completed === 1
+                        ? "task"
+                        : "tasks"
+                    } remaining`
+                  : assignmentStats.total > 0
+                    ? "All assignments completed"
+                    : "No assignments yet"
+              }
+              accent="emerald"
+            />
+            <StatCard
+              icon={<Brain size={19} />}
+              label="Learning score"
+              value={`${learningScore}%`}
+              detail={`${assignmentCompletion}% assignments completed · ${weeklyGoalProgress}% weekly focus goal`}
+              accent="cyan"
+            />
+          </section>
+          <section className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
+            {/* Assignments */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Assignments</h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Keep your upcoming work under control.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate("/assignments")}
+                  className="text-xs font-semibold text-violet-600 hover:text-violet-500"
+                >
+                  View all
+                </button>
+              </div>
+              <div className="space-y-3">
+                {assignmentsLoading ? (
+                  <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-10 text-sm text-slate-500">
+                    Loading assignments...
+                  </div>
+                ) : dashboardAssignments.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+                    <FileText className="mx-auto text-slate-300" size={28} />
+                    <p className="mt-3 text-sm font-semibold text-slate-700">
+                      No assignments yet
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add your first assignment to see it here.
+                    </p>
+                    <button
+                      onClick={() => navigate("/assignments")}
+                      className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-xs font-semibold !text-white hover:bg-violet-600"
+                    >
+                      Add Assignment
+                    </button>
+                  </div>
+                ) : (
+                  dashboardAssignments.map((item, index) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.08 }}
+                      className="group rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-200 hover:bg-white"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            item.color === "violet"
+                              ? "bg-violet-500/10 text-violet-600"
+                              : item.color === "cyan"
+                                ? "bg-cyan-500/10 text-cyan-600"
+                                : item.color === "emerald"
+                                  ? "bg-emerald-500/10 text-emerald-600"
+                                  : "bg-orange-500/10 text-orange-600"
+                          }`}
+                        >
+                          <FileText size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {item.title}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {item.subject}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${
+                                item.priority === "High"
+                                  ? "bg-rose-50 text-rose-600"
+                                  : item.priority === "Low"
+                                    ? "bg-emerald-50 text-emerald-600"
+                                    : "bg-amber-50 text-amber-600"
+                              }`}
+                            >
+                              {item.priority}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-slate-500">
+                              {item.completed ? "Completed" : `Due ${item.due}`}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-400">
+                              {item.estimated_minutes >= 60
+                                ? `${Math.floor(item.estimated_minutes / 60)}h ${item.estimated_minutes % 60 ? `${item.estimated_minutes % 60}m` : ""}`
+                                : `${item.estimated_minutes}m`}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center gap-3">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-violet-500 transition-all"
+                                style={{
+                                  width: `${
+                                    item.completed
+                                      ? 100
+                                      : Math.min(
+                                          100,
+                                          Math.round(
+                                            ((assignmentFocusSeconds[item.id] || 0) /
+                                              Math.max(
+                                                1,
+                                                item.estimated_minutes * 60,
+                                              )) *
+                                              100,
+                                          ),
+                                        )
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-[10px] font-bold text-slate-500">
+                              {item.completed
+                                ? "100%"
+                                : `${Math.min(
+                                    100,
+                                    Math.round(
+                                      ((assignmentFocusSeconds[item.id] || 0) /
+                                        Math.max(
+                                          1,
+                                          item.estimated_minutes * 60,
+                                        )) *
+                                        100,
+                                    ),
+                                  )}%`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+          {/* Bottom widgets */}
+          <section className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="relative overflow-hidden rounded-2xl border border-violet-500/15 bg-gradient-to-br from-violet-500/[0.11] via-white/[0.025] to-cyan-500/[0.04] p-6">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+              <div className="relative">
+                <div className="mb-4 flex items-center gap-2 text-violet-300">
+                  <Sparkles size={17} />
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    StudySync AI
+                  </span>
+                </div>
+                <h3 className="max-w-md text-xl font-semibold">
+                  What do you want to learn today?
+                </h3>
+                <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600">
+                  Generate a study plan, explain a difficult concept, create
+                  practice questions, or review your progress.
+                </p>
+                <button className="mt-5 flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-violet-500/20 hover:bg-violet-400">
+                  Start with StudySync AI
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Weekly focus goal</h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {formatStudyDuration(weeklyGoalSeconds)} target
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
+                  <Target size={18} />
+                </div>
+              </div>
+              <div className="mt-6 flex items-end justify-between">
+                <div>
+                  <span className="text-3xl font-bold">
+                    {formatStudyDuration(weeklyFocusSeconds)}
+                  </span>
+                  <span className="ml-2 text-xs text-slate-600">
+                    / {formatStudyDuration(weeklyGoalSeconds)}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-slate-500">
+                  {weeklyGoalProgress}%
+                </span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${weeklyGoalProgress}%` }}
+                  transition={{ duration: 1 }}
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-500"
+                />
+              </div>
+              <div className="mt-4 flex items-center justify-between text-[11px] text-slate-600">
+                <span>
+                  {weeklyGoalSeconds > weeklyFocusSeconds
+                    ? `${formatStudyDuration(
+                        weeklyGoalSeconds - weeklyFocusSeconds,
+                      )} remaining`
+                    : "Weekly goal reached"}
+                </span>
+                <span>
+                  {weeklyGoalProgress >= 100
+                    ? "Goal reached"
+                    : "Keep going"}
+                </span>
+              </div>
+            </div>
+          </section>
+              </>
+            } />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
+}
+function StatCard({
+  icon,
+  label,
+  value,
+  detail,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  accent: "orange" | "violet" | "emerald" | "cyan";
+}) {
+  const styles = {
+    orange: "bg-orange-400/10 text-orange-400",
+    violet: "bg-violet-500/10 text-violet-400",
+    emerald: "bg-emerald-400/10 text-emerald-400",
+    cyan: "bg-cyan-400/10 text-cyan-400",
+  };
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      className="group rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-200 hover:bg-white hover:shadow-xl hover:shadow-black/10"
+    >
+      <div className="flex items-start justify-between">
+        <div className={`rounded-xl p-2.5 ${styles[accent]}`}>{icon}</div>
+        <MoreHorizontal size={17} className="text-slate-700" />
+      </div>
+      <p className="mt-5 text-xs font-medium text-slate-600">{label}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+      <p className="mt-1 text-[11px] text-slate-600">{detail}</p>
+    </motion.div>
+  );
+}
+export default App;

@@ -190,6 +190,28 @@ def setup_profile(
 
 
 
+@router.patch("/account")
+def update_account(
+    data: SetupRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user.name = data.name.strip()
+    user.grade = data.grade.strip()
+    user.subjects = ",".join(
+        subject.strip()
+        for subject in data.subjects
+        if subject.strip()
+    )
+    user.daily_goal = data.daily_goal.strip()
+    user.preferred_study_time = data.preferred_study_time.strip()
+
+    db.commit()
+    db.refresh(user)
+
+    return user_response(user)
+
+
 @router.delete("/account")
 def delete_account(
     user: User = Depends(get_current_user),

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
+  BookOpen,
   CheckCircle2,
   Clock3,
+  GraduationCap,
   Expand,
   Leaf,
   Music2,
@@ -89,31 +91,25 @@ const AMBIENT_SOUNDS = [
     id: "deep-focus",
     name: "Deep Focus",
     description: "Ambient · Lo-Fi",
-    url: "PASTE_DEEP_FOCUS_AUDIO_URL_HERE",
+    url: "/audio/deep%20focus.mp3",
   },
   {
     id: "rain",
     name: "Rain",
     description: "Soft rainfall",
-    url: "PASTE_RAIN_AUDIO_URL_HERE",
+    url: "/audio/rain.mp3",
   },
   {
     id: "forest",
     name: "Forest",
     description: "Nature ambience",
-    url: "PASTE_FOREST_AUDIO_URL_HERE",
-  },
-  {
-    id: "cafe",
-    name: "Café",
-    description: "Soft background chatter",
-    url: "PASTE_CAFE_AUDIO_URL_HERE",
+    url: "/audio/forest.mp3",
   },
   {
     id: "white-noise",
     name: "White Noise",
     description: "Steady focus noise",
-    url: "PASTE_WHITE_NOISE_AUDIO_URL_HERE",
+    url: "/audio/white%20noise.mp3",
   },
 ] as const;
 
@@ -191,6 +187,7 @@ function formatSessionDate(dateString: string | null): string {
 }
 
 export default function FocusMode() {
+
   const navigate = useNavigate();
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -199,6 +196,13 @@ export default function FocusMode() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<
     number | null
   >(null);
+
+  const [selectionMode, setSelectionMode] = useState<
+    "assignment" | "subject"
+  >("assignment");
+
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [studentSubjects, setStudentSubjects] = useState<string[]>([]);
 
   const [selectedLength, setSelectedLength] = useState(25 * 60);
   const [customMinutes, setCustomMinutes] = useState(30);
@@ -518,20 +522,49 @@ function getDayTotal(sessionsForDay: StudySession[]) {
     if (!token) return;
 
     try {
-      const response = await apiFetch<AssignmentsResponse>(
-        "/api/assignments",
-        {
+      const [assignmentResponse, userResponse] = await Promise.all([
+        apiFetch<AssignmentsResponse>("/api/assignments", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        },
-      );
+        }),
+        apiFetch<{
+          user: {
+            subjects: string[] | string;
+          };
+        }>("/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
 
       setAssignments(
-        response.assignments.filter((assignment) => !assignment.completed),
+        assignmentResponse.assignments.filter(
+          (assignment) => !assignment.completed,
+        ),
       );
+
+      const rawSubjects = userResponse.user?.subjects;
+
+      const subjects = Array.isArray(rawSubjects)
+        ? rawSubjects
+            .map((subject) => subject.trim())
+            .filter(Boolean)
+        : typeof rawSubjects === "string"
+          ? rawSubjects
+              .split(",")
+              .map((subject) => subject.trim())
+              .filter(Boolean)
+          : [];
+
+      setStudentSubjects(subjects);
+
+      if (subjects.length > 0) {
+        setSelectedSubject((current) => current || subjects[0]);
+      }
     } catch (error) {
-      console.error("Failed to load assignments:", error);
+      console.error("Failed to load Focus Mode setup:", error);
     }
   }
 
@@ -789,28 +822,54 @@ function getDayTotal(sessionsForDay: StudySession[]) {
   }
 
   function startSession() {
-    const assignment = assignments.find(
-      (item) => item.id === selectedAssignmentId,
-    );
-
-    if (!assignment) {
-      setMessage("Choose an assignment before starting.");
-      return;
-    }
-
     const duration =
       selectedLength === -1
         ? Math.max(1, customMinutes) * 60
         : selectedLength;
 
+    let assignmentId: number | null = null;
+    let assignmentTitle = "";
+    let subject = "";
+
+    if (selectionMode === "assignment") {
+      const assignment = assignments.find(
+        (item) => item.id === selectedAssignmentId,
+      );
+
+      if (!assignment) {
+        setMessage("Choose an assignment before starting.");
+        return;
+      }
+
+      assignmentId = assignment.id;
+      assignmentTitle = assignment.title;
+      subject = assignment.subject;
+    } else {
+      subject = selectedSubject.trim();
+
+      if (!subject) {
+        setMessage("Choose a subject before starting.");
+        return;
+      }
+    }
+
     const startedAt = new Date().toISOString();
     const endAt = Date.now() + duration * 1000;
 
-    // Selected assignment becomes the active Focus assignment.
-    setActiveAssignmentId(assignment.id);
-    setActiveAssignmentTitle(assignment.title);
-    setActiveSubject(assignment.subject);
-    setActiveDueDate(assignment.due_date || "");
+    setActiveAssignmentId(assignmentId);
+    setActiveAssignmentTitle(assignmentTitle);
+    setActiveSubject(subject);
+
+    if (assignmentId !== null) {
+      const assignment = assignments.find(
+        (item) => item.id === assignmentId,
+      );
+
+      setActiveDueDate(assignment?.due_date || "");
+    } else {
+      setActiveDueDate("");
+    }
+
     setActiveSessionLength(duration);
     setSessionStartedAt(startedAt);
     setSeconds(duration);
@@ -826,9 +885,9 @@ function getDayTotal(sessionsForDay: StudySession[]) {
         endAt,
         seconds: duration,
         sessionStartedAt: startedAt,
-        assignmentId: assignment.id,
-        assignmentTitle: assignment.title,
-        subject: assignment.subject,
+        assignmentId,
+        assignmentTitle,
+        subject,
         sessionLength: duration,
       } satisfies TimerStorage),
     );
@@ -964,7 +1023,7 @@ function getDayTotal(sessionsForDay: StudySession[]) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-[#f4f7fc] text-slate-900">
         {/* Header */}
-        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative z-[60] mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/20">
@@ -975,6 +1034,7 @@ function getDayTotal(sessionsForDay: StudySession[]) {
                 <h1 className="text-3xl font-bold tracking-tight text-slate-950">
                   Focus Mode
                 </h1>
+
                 <p className="mt-1 text-sm text-slate-500">
                   A distraction-free space for focused study.
                 </p>
@@ -982,26 +1042,33 @@ function getDayTotal(sessionsForDay: StudySession[]) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="relative z-[70] flex items-center gap-2.5">
+            <div className="relative z-[80]">
               <button
                 onClick={() => setAmbientMenuOpen((open) => !open)}
                 className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-violet-200 hover:bg-violet-50"
                 type="button"
+                aria-expanded={ambientMenuOpen}
               >
                 <Music2 size={17} className="text-violet-600" />
+
                 Ambient Sounds
+
                 <span className="text-slate-400">
                   {ambientMenuOpen ? "⌃" : "⌄"}
                 </span>
               </button>
 
               {ambientMenuOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-                  <div className="px-3 pb-2 pt-2">
+                <div
+                  className="absolute right-0 top-[calc(100%+8px)] z-[9999] w-[300px] max-h-[360px] overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_20px_50px_rgba(15,23,42,0.18)]"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="px-2.5 pb-1.5 pt-1.5">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-violet-500">
                       Ambient Library
                     </p>
+
                     <p className="mt-1 text-xs text-slate-500">
                       Choose a sound for your focus session.
                     </p>
@@ -1011,21 +1078,25 @@ function getDayTotal(sessionsForDay: StudySession[]) {
                     <button
                       key={sound.id}
                       type="button"
-                      onClick={() => void startAmbientSound(sound.id)}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
+                      onClick={() => {
+                        setActiveSound(sound.id);
+                        void startAmbientSound(sound.id);
+                      }}
+                      className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition ${
                         activeSound === sound.id
                           ? "bg-violet-50 text-violet-700"
-                          : "hover:bg-slate-50"
+                          : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
                         <Music2 size={15} />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">
+                        <p className="text-[13px] font-bold">
                           {sound.name}
                         </p>
+
                         <p className="mt-0.5 text-[11px] text-slate-400">
                           {sound.description}
                         </p>
@@ -1039,9 +1110,10 @@ function getDayTotal(sessionsForDay: StudySession[]) {
                     </button>
                   ))}
 
-                  <div className="mt-1 border-t border-slate-100 px-3 py-3">
+                  <div className="mt-1 border-t border-slate-100 px-2.5 py-2">
                     <div className="flex items-center gap-2">
                       <Volume2 size={14} className="text-slate-400" />
+
                       <input
                         type="range"
                         min="0"
@@ -1052,7 +1124,9 @@ function getDayTotal(sessionsForDay: StudySession[]) {
                           handleSoundVolume(Number(event.target.value))
                         }
                         className="w-full accent-violet-500"
+                        aria-label="Ambient sound volume"
                       />
+
                       <span className="w-8 text-right text-[10px] font-semibold text-slate-400">
                         {Math.round(soundVolume * 100)}%
                       </span>
@@ -1874,158 +1948,438 @@ function getDayTotal(sessionsForDay: StudySession[]) {
         </div>
       </div>
 
-      {/* Choose assignment */}
+      {/* Choose what to study */}
       <section className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] ">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
           What are you working on?
         </p>
 
-        {assignments.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-            <p className="font-semibold text-white">
-              No active assignments
-            </p>
-            <p className="mt-2 text-sm ">
-              Add an assignment first, then come back here to focus.
-            </p>
-            <button
-              onClick={() => navigate("/assignments")}
-              className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
-            >
-              Go to Assignments
-            </button>
-          </div>
-        ) : (
+        {/* Assignment / Subject switch */}
+        <div className="mt-5 grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionMode("assignment");
+              setMessage("");
+            }}
+            className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+              selectionMode === "assignment"
+                ? "bg-white text-violet-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Assignment
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectionMode("subject");
+              setSelectedAssignmentId(null);
+              setActiveAssignmentId(null);
+              setActiveAssignmentTitle("");
+              setActiveDueDate("");
+              setActiveSubject(selectedSubject);
+              setMessage("");
+            }}
+            className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+              selectionMode === "subject"
+                ? "bg-white text-violet-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Subject
+          </button>
+        </div>
+
+        {/* Assignment selection */}
+        {selectionMode === "assignment" && (
           <>
-            <div className="mt-5 space-y-3">
-              {assignments.map((assignment) => (
-                <button
-                  key={assignment.id}
-                  onClick={() => {
-                    setSelectedAssignmentId(assignment.id);
-                    setActiveAssignmentId(assignment.id);
-                    setActiveAssignmentTitle(assignment.title);
-                    setActiveSubject(assignment.subject);
-                    setActiveDueDate(assignment.due_date || "");
-                    setMessage("");
-                  }}
-                  className={`w-full rounded-2xl border p-5 text-left transition ${
-                    selectedAssignmentId === assignment.id
-                      ? "border-violet-400 bg-violet-50/60 ring-2 ring-violet-500/10"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-white">
-                        {assignment.title}
-                      </p>
-                      <p className="mt-1 text-sm ">
-                        {assignment.subject}
-                        {assignment.due_date
-                          ? ` · Due ${assignment.due_date}`
-                          : ""}
-                      </p>
-                    </div>
+            {assignments.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+                  <BookOpen size={21} />
+                </div>
 
-                    {selectedAssignmentId === assignment.id && (
-                      <CheckCircle2
-                        size={20}
-                        className="shrink-0 text-violet-600"
-                      />
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
+                <p className="mt-4 font-semibold text-slate-800">
+                  No active assignments
+                </p>
 
-            <div className="mt-8 border-t border-slate-100 pt-7">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] ">
-                Session length
-              </p>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  You don't need an assignment to focus. Choose a subject
+                  instead, or create an assignment first.
+                </p>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {SESSION_OPTIONS.map((option) => (
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
                   <button
-                    key={option.seconds}
-                    onClick={() =>
-                      setSelectedLength(option.seconds)
-                    }
-                    className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
-                      selectedLength === option.seconds
-                        ? "border-slate-950 bg-slate-950"
-                        : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
-                    style={{
-                      color:
-                        selectedLength === option.seconds
-                          ? "#ffffff"
-                          : "#334155",
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode("subject");
+
+                      if (studentSubjects.length > 0) {
+                        const subject =
+                          selectedSubject || studentSubjects[0];
+
+                        setSelectedSubject(subject);
+                        setActiveSubject(subject);
+                      }
                     }}
+                    className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-700"
                   >
-                    {option.label}
+                    Choose Subject
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/assignments")}
+                    className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Add Assignment
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 space-y-3">
+                {assignments.map((assignment) => (
+                  <button
+                    key={assignment.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAssignmentId(assignment.id);
+                      setActiveAssignmentId(assignment.id);
+                      setActiveAssignmentTitle(assignment.title);
+                      setActiveSubject(assignment.subject);
+                      setActiveDueDate(assignment.due_date || "");
+                      setMessage("");
+                    }}
+                    className={`w-full rounded-2xl border p-5 text-left transition ${
+                      selectedAssignmentId === assignment.id
+                        ? "border-violet-400 bg-violet-50/60 ring-2 ring-violet-500/10"
+                        : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {assignment.title}
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          {assignment.subject}
+                          {assignment.due_date
+                            ? ` · Due ${assignment.due_date}`
+                            : ""}
+                        </p>
+                      </div>
+
+                      {selectedAssignmentId === assignment.id && (
+                        <CheckCircle2
+                          size={20}
+                          className="shrink-0 text-violet-600"
+                        />
+                      )}
+                    </div>
                   </button>
                 ))}
-
-                <button
-                  onClick={() => setSelectedLength(-1)}
-                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition sm:col-span-1 ${
-                    selectedLength === -1
-                      ? "border-slate-950 bg-slate-950"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                  }`}
-                  style={{
-                    color: selectedLength === -1 ? "#ffffff" : "#334155",
-                  }}
-                >
-                  Custom
-                </button>
-              </div>
-
-              {selectedLength === -1 && (
-                <div className="mt-4 flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={customMinutes}
-                    onChange={(event) =>
-                      setCustomMinutes(
-                        Math.max(
-                          1,
-                          Number(event.target.value) || 1,
-                        ),
-                      )
-                    }
-                    className="w-28 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-violet-400"
-                  />
-                  <span className="text-sm ">
-                    minutes
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {selectedAssignment && (
-              <div className="mt-8">
-                <button
-                  onClick={startSession}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 py-4 text-sm font-semibold transition hover:bg-slate-800"
-                  style={{ color: "#ffffff" }}
-                >
-                  <Play size={17} />
-                  Start Focus Session
-                </button>
               </div>
             )}
 
-            {message && (
-              <p className="mt-4 text-center text-sm text-red-500">
-                {message}
-              </p>
+            {selectedAssignment && (
+              <div className="mt-5 rounded-2xl border border-violet-100 bg-violet-50/60 px-4 py-3">
+                <p className="text-xs font-semibold text-violet-700">
+                  Assignment selected: {selectedAssignment.title}
+                </p>
+
+                <p className="mt-1 text-[11px] text-violet-600/80">
+                  Your Focus session will be linked to this assignment.
+                </p>
+              </div>
             )}
           </>
         )}
+
+        {/* Subject selection */}
+        {selectionMode === "subject" && (
+          <>
+            {studentSubjects.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+                  <GraduationCap size={21} />
+                </div>
+
+                <p className="mt-4 font-semibold text-slate-800">
+                  No subjects found
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Add your subjects in your profile and they will appear here.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20"
+                >
+                  Open Profile
+                </button>
+              </div>
+            ) : (
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {studentSubjects.map((subject) => {
+                  const selected = selectedSubject === subject;
+
+                  return (
+                    <button
+                      key={subject}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSubject(subject);
+                        setSelectedAssignmentId(null);
+                        setActiveAssignmentId(null);
+                        setActiveAssignmentTitle("");
+                        setActiveDueDate("");
+                        setActiveSubject(subject);
+                        setMessage("");
+                      }}
+                      className={`rounded-2xl border p-5 text-left transition ${
+                        selected
+                          ? "border-violet-400 bg-violet-50/60 ring-2 ring-violet-500/10"
+                          : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                              selected
+                                ? "bg-violet-100 text-violet-600"
+                                : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            <GraduationCap size={18} />
+                          </div>
+
+                          <div>
+                            <p className="font-semibold text-slate-800">
+                              {subject}
+                            </p>
+
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              Independent study
+                            </p>
+                          </div>
+                        </div>
+
+                        {selected && (
+                          <CheckCircle2
+                            size={19}
+                            className="shrink-0 text-violet-600"
+                          />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedSubject && (
+              <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50/60 px-4 py-3">
+                <p className="text-xs font-semibold text-cyan-700">
+                  Studying: {selectedSubject}
+                </p>
+
+                <p className="mt-1 text-[11px] text-cyan-600/80">
+                  This session will be saved to your {selectedSubject} study
+                  history without requiring an assignment.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Session length */}
+        <div className="mt-8 border-t border-slate-100 pt-7">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Session length
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {SESSION_OPTIONS.map((option) => (
+              <button
+                key={option.seconds}
+                type="button"
+                onClick={() => setSelectedLength(option.seconds)}
+                className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                  selectedLength === option.seconds
+                    ? "border-slate-950 bg-slate-950 !text-white shadow-sm"
+                    : "border-slate-200 bg-white !text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => setSelectedLength(-1)}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                selectedLength === -1
+                  ? "border-violet-500 bg-slate-950 !text-white shadow-md shadow-violet-500/20"
+                  : "border-slate-200 bg-white !text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+
+          {selectedLength === -1 && (
+            <div className="mt-4 flex items-center gap-3">
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={customMinutes}
+                onChange={(event) =>
+                  setCustomMinutes(
+                    Math.max(1, Number(event.target.value) || 1),
+                  )
+                }
+                className="w-28 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm !text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+              />
+
+              <span className="text-sm text-slate-500">
+                minutes
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Start */}
+        <div className="mt-8">
+          <button
+            type="button"
+            onClick={startSession}
+            disabled={
+              selectionMode === "assignment"
+                ? !selectedAssignment
+                : !selectedSubject
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-6 py-4 text-sm font-semibold !text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:!text-slate-300 disabled:opacity-100"
+          >
+            <Play size={17} />
+            Start Focus Session
+          </button>
+        </div>
+
+        {message && (
+          <p className="mt-4 text-center text-sm text-red-500">
+            {message}
+          </p>
+        )}
+      </section>
+
+
+      {/* Focus Music */}
+      <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+              <Music2 size={21} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Focus Music
+              </p>
+
+              <h3 className="mt-1 text-lg font-bold text-slate-900">
+                {activeSoundMeta.name}
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {activeSoundMeta.description} · Loops during your session
+              </p>
+            </div>
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAmbientMenuOpen((current) => !current)}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-600"
+            >
+              <Music2 size={16} />
+              Choose sound
+            </button>
+
+            {ambientMenuOpen && (
+              <div className="absolute right-0 top-12 z-30 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                {AMBIENT_SOUNDS.map((sound) => (
+                  <button
+                    key={sound.id}
+                    type="button"
+                    onClick={() => {
+                        setActiveSound(sound.id);
+                        void startAmbientSound(sound.id);
+                      }}
+                    className={`w-full rounded-xl px-3 py-3 text-left transition ${
+                      activeSound === sound.id
+                        ? "bg-violet-50 text-violet-700"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">{sound.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {sound.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={toggleAmbientSound}
+            className="flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            {soundPlaying ? (
+              <>
+                <Pause size={17} />
+                Pause Music
+              </>
+            ) : (
+              <>
+                <Play size={17} />
+                Play Music
+              </>
+            )}
+          </button>
+
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Volume2 size={17} className="shrink-0 text-slate-400" />
+
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={soundVolume}
+              onChange={(event) =>
+                setSoundVolume(Number(event.target.value))
+              }
+              className="w-full accent-violet-600"
+              aria-label="Music volume"
+            />
+
+            <span className="w-10 text-right text-xs font-semibold text-slate-400">
+              {Math.round(soundVolume * 100)}%
+            </span>
+          </div>
+        </div>
       </section>
 
       {/* Today's focus */}
