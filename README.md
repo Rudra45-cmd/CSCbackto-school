@@ -1,75 +1,75 @@
-# React + TypeScript + Vite
+# StudySync
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> AI-powered student workspace for the CSC Back-to-School Hackathon.
 
-Currently, two official plugins are available:
+StudySync brings learning, planning, focus, community, announcements, and student management into one platform.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Live Demo
 
-## React Compiler
+- Frontend: https://potential-orbit-r4rxg556jq76hw77q-5173.app.github.dev
+- Backend: https://potential-orbit-r4rxg556jq76hw77q-8100.app.github.dev
+- API Health: https://potential-orbit-r4rxg556jq76hw77q-8100.app.github.dev/api/health
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- AI Learning Assistant
+- Personalized Student Dashboard
+- Assignments
+- Study Planner
+- Focus Mode
+- Ambient Sounds: Deep Focus, Rain, Forest, White Noise
+- Community Posts, Likes, and Replies
+- School Announcements
+- Student Profile
+- Settings
+- JWT Authentication
+- Persistent Backend Data
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Technology Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Frontend
+React, TypeScript, Vite, Tailwind CSS, Framer Motion, React Router, TanStack React Query, Axios, Lucide React
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Backend
+Python, FastAPI, SQLAlchemy, SQLite, JWT, bcrypt
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### AI
+Google Gemini with the official google-genai SDK
 
-```
+## Development
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Backend:
 
-```
+
+
+Production build:
+
+
+
+## Security
+
+Environment files and API credentials are excluded from Git. Authentication uses JWT and passwords are hashed with bcrypt.
+
+## Project Status
+
+- Frontend production build: Passing
+- Backend: Healthy
+- Authentication: Implemented
+- Student Profile: Implemented
+- Assignments: Implemented
+- Study Planner: Implemented
+- Focus Mode: Implemented
+- Ambient Sounds: Implemented
+- Community: Backend-connected
+- Announcements: Backend-connected
+- Deployment: Working
+
+## Hackathon
+
+StudySync was created for the CSC Back-to-School Hackathon.
+
+## Repository
+
+https://github.com/Rudra45-cmd/CSCbackto-school
